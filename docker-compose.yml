@@ -1,0 +1,121 @@
+# SimRule UI - Docker Compose Configuration
+# Includes: simrule-ui, simrule-api, MongoDB
+#
+# Usage:
+#   docker-compose up -d              # Start all services
+#   docker-compose down               # Stop all services
+#   docker-compose logs -f simrule-ui # View UI logs
+#   docker-compose build --no-cache   # Rebuild images
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # SimRule UI - React Frontend
+  # ===========================================================================
+  simrule-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: simrule-ui
+    ports:
+      - "4200:80"
+    environment:
+      - API_URL=http://simrule-api:8081/api/v1
+    networks:
+      - ruleweaver-network
+    depends_on:
+      simrule-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # ===========================================================================
+  # SimRule API - Spring Boot Backend
+  # ===========================================================================
+  simrule-api:
+    image: simrule-api:latest
+    container_name: simrule-api
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATA_MONGODB_URI=mongodb://simrule-db:27017/simrule
+      - SPRING_DATA_MONGODB_DATABASE=simrule
+      - RULE_INSPECTOR_URL=http://rule-inspector:8080/api/v1
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    networks:
+      - ruleweaver-network
+    depends_on:
+      simrule-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # ===========================================================================
+  # SimRule Database - MongoDB
+  # ===========================================================================
+  simrule-db:
+    image: mongo:7
+    container_name: simrule-db
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=simrule
+    volumes:
+      - simrule-mongo-data:/data/db
+      - simrule-mongo-config:/data/configdb
+    networks:
+      - ruleweaver-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Rule Inspector - Drools Execution Service (Optional)
+  # ===========================================================================
+  # rule-inspector:
+  #   image: rule-inspector:latest
+  #   container_name: rule-inspector
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - JAVA_OPTS=-Xmx512m -Xms256m
+  #   networks:
+  #     - ruleweaver-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #   restart: unless-stopped
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  ruleweaver-network:
+    driver: bridge
+    name: ruleweaver-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  simrule-mongo-data:
+    name: simrule-mongo-data
+  simrule-mongo-config:
+    name: simrule-mongo-config
