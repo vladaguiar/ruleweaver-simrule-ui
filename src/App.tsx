@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { AppProvider } from "./contexts/AppContext";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./components/Dashboard";
 import { Scenarios } from "./components/Scenarios";
@@ -7,37 +8,72 @@ import { Results } from "./components/Results";
 import { Coverage } from "./components/Coverage";
 import { Datasets } from "./components/Datasets";
 import { Settings } from "./components/Settings";
+import { ScenarioEditor } from "./components/ScenarioEditor";
+
+// Page state type for better type safety
+type PageType =
+  | 'dashboard'
+  | 'scenarios'
+  | 'scenario-editor'
+  | 'simulations'
+  | 'results'
+  | 'coverage'
+  | 'datasets'
+  | 'settings';
+
+interface PageState {
+  page: PageType;
+  params?: {
+    scenarioId?: string;
+    simulationId?: string;
+  };
+}
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState("dashboard");
+  const [pageState, setPageState] = useState<PageState>({ page: "dashboard" });
+
+  const navigate = (page: string, params?: PageState['params']) => {
+    setPageState({ page: page as PageType, params });
+  };
 
   const renderPage = () => {
-    switch (currentPage) {
+    switch (pageState.page) {
       case "dashboard":
-        return <Dashboard />;
+        return <Dashboard onNavigate={navigate} />;
       case "scenarios":
-        return <Scenarios />;
+        return <Scenarios onNavigate={navigate} />;
+      case "scenario-editor":
+        return (
+          <ScenarioEditor
+            scenarioId={pageState.params?.scenarioId}
+            onNavigate={navigate}
+            onSave={() => navigate('scenarios')}
+            onCancel={() => navigate('scenarios')}
+          />
+        );
       case "simulations":
-        return <SimulationRunner />;
+        return <SimulationRunner onNavigate={navigate} />;
       case "results":
-        return <Results />;
+        return <Results simulationId={pageState.params?.simulationId} onNavigate={navigate} />;
       case "coverage":
-        return <Coverage />;
+        return <Coverage onNavigate={navigate} />;
       case "datasets":
-        return <Datasets />;
+        return <Datasets onNavigate={navigate} />;
       case "settings":
         return <Settings />;
       default:
-        return <Dashboard />;
+        return <Dashboard onNavigate={navigate} />;
     }
   };
 
   return (
-    <Layout
-      currentPage={currentPage}
-      onNavigate={setCurrentPage}
-    >
-      {renderPage()}
-    </Layout>
+    <AppProvider>
+      <Layout
+        currentPage={pageState.page}
+        onNavigate={(page) => navigate(page)}
+      >
+        {renderPage()}
+      </Layout>
+    </AppProvider>
   );
 }
