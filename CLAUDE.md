@@ -1,117 +1,93 @@
-# SimRule Web UI (React) - Project Instructions
+# CLAUDE.md
 
-## Project Vision
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Build an enterprise-grade testing and simulation platform for Drools business rules. SimRule enables business analysts, QA engineers, and developers to comprehensively test, validate, and simulate business rules before production deployment through an intuitive, responsive web interface.
+## Build and Development Commands
 
----
+```bash
+# Install dependencies
+npm install
 
-## What is SimRule?
+# Start development server (runs on http://localhost:3000)
+npm run dev
 
-SimRule (Enterprise Rule Simulator) is a complete testing platform within the RuleWeaver ecosystem:
+# Production build (outputs to ./build)
+npm run build
+```
 
-1. **simrule-ui** (this project) - React 18+ web application for interactive testing
-2. **simrule-api** (backend) - Spring Boot microservice providing simulation engine and REST APIs (port 8081)
-3. **simrule-db** (data layer) - MongoDB collections for scenarios, results, datasets, and coverage reports
-4. **Rule Inspector** (integration) - Executes actual rule validations (separate microservice on port 8080)
+## Project Overview
 
-**SimRule is NOT a simple validation UI** - it's a comprehensive testing platform that provides:
-- Test scenario management with versioning
-- Batch simulation execution against large datasets
-- Rule coverage analysis and reporting
-- Performance testing and benchmarking
-- Regression testing across rule versions
-- CI/CD pipeline integration
-- Visual analytics and reporting
+SimRule UI is a React 18+ testing platform for Drools business rules validation, part of the RuleWeaver ecosystem. It provides test scenario management, batch simulation execution, rule coverage analysis, and result visualization.
 
----
+**Key Ecosystem Components**:
+- **simrule-ui** (this project) - React web application
+- **simrule-api** (backend) - Spring Boot on port 8081
+- **simrule-db** - MongoDB for data persistence
+- **Rule Inspector** - Rule execution service on port 8080
 
-## Core Requirements
+**Backend Integration**: This UI connects to `simrule-api` (port 8081), NOT directly to Rule Inspector.
 
-### Technology Stack
+## Architecture
 
-**Core Framework**
-- **React**: 18+ with TypeScript
-- **TypeScript**: 5.4.0
-- **Node.js**: 22.16.0 (minimum 18.x LTS required)
-- **npm**: 10.5.0 (minimum 9.x required)
-- **Vite**: Build tooling and dev server
-- **React Router**: v6 for navigation
+### Current Tech Stack
+- **Framework**: React 18 with TypeScript, Vite with SWC
+- **UI Components**: Radix UI primitives with Tailwind CSS (shadcn/ui style)
+- **Charts**: Recharts
+- **Forms**: React Hook Form
 
-**State Management**
-- **Context API**: React Context for global state
-- **React Query** (@tanstack/react-query): Server state management and caching
-- **Custom Hooks**: useScenarios, useSimulation, useWebSocket, useCoverage, useDatasets
+### Project Structure
 
-**UI Component Library**
-- **Material-UI (MUI)**: v5 for component library
-- **Emotion**: CSS-in-JS styling (MUI dependency)
-- **Material Icons**: Icon library
+```
+src/
+├── App.tsx                    # Main app with state-based routing
+├── main.tsx                   # Application entry point
+├── components/
+│   ├── Layout.tsx             # Main layout with sidebar navigation
+│   ├── Dashboard.tsx          # Overview stats and quick actions
+│   ├── Scenarios.tsx          # Test scenario management
+│   ├── SimulationRunner.tsx   # Batch execution runner
+│   ├── Results.tsx            # Simulation results viewer
+│   ├── Coverage.tsx           # Rule coverage analysis
+│   ├── Datasets.tsx           # Test data management
+│   ├── Settings.tsx           # App configuration
+│   └── ui/                    # Radix-based UI primitives
+```
 
-**Data Visualization & Tables**
-- **Recharts**: Charts for coverage and performance metrics
-- **React Table** (@tanstack/react-table): v8 for data grids (scenarios, simulations, results)
-- **React DnD**: Drag-and-drop for dataset management
+### Navigation Pattern
+The app uses state-based routing in `App.tsx` with a `currentPage` state variable. Navigation is handled via the `onNavigate` callback passed to `Layout.tsx`.
 
-**Form Management & Validation**
-- **React Hook Form**: Form management and validation
-- **Zod**: Schema validation (optional, with React Hook Form)
+### Path Alias
+Use `@/` to reference `src/` directory (configured in `vite.config.ts`).
 
-**Code Editor**
-- **Monaco Editor**: 0.52.2 (JSON/DRL editing with syntax highlighting)
-- **@monaco-editor/react**: React wrapper for Monaco
+## API Integration
 
-**Utilities**
-- **Axios**: HTTP client for API requests
-- **date-fns**: Date manipulation and formatting
-- **Lodash**: 4.17.21 (utility functions)
-- **File Saver**: Export functionality (CSV, PDF)
-- **Marked**: 16.0.0 (Markdown rendering for help text)
-- **uuid**: Correlation ID generation
-
-**Testing & Quality Tools**
-- **Vitest**: Unit testing (Vite-native test runner)
-- **React Testing Library**: Component testing
-- **Playwright**: 1.55.1 (E2E testing)
-- **Cypress**: 14.5.1 (optional legacy E2E)
-- **Puppeteer**: 22.0.0 (optional for advanced automation)
-
-**Build & Analysis Tools**
-- **Vite Bundle Analyzer**: Bundle size analysis
-- **Source Map Explorer**: 2.5.3 (source map analysis)
-
-### Architecture Constraints
-
-- React functional components with hooks (no class components)
-- TypeScript strict mode for type safety
-- Code splitting and lazy loading for performance
-- Mobile-responsive design (mobile-first approach)
-- Accessibility compliance (WCAG 2.1 AA)
-- Progressive Web App (PWA) capabilities
-- WebSocket integration for real-time simulation progress
-
----
-
-## API Documentation Location
-
-**CRITICAL**: SimRule UI integrates with **simrule-api**, not Rule Inspector directly.
-
-**API Specifications**:
-- **OpenAPI 3.0 Specification**: `\simrule-ui\SimRule API OpenAPI v3.0.1.json`
-- **Additional Documentation**: `C:\Users\vlada\Documents\Work\tekWeaverSolutions\RuleWeaver\simrule\simrule-ui\SIMRULE_API_DOCUMENTATION.md`
-- **Swagger UI**: `http://localhost:8081/swagger-ui.html` (when simrule-api is running)
-
-**API Base URLs**:
+**Base URLs**:
 - Development: `http://localhost:8081/api/v1`
-- Docker: `http://simrule-api:8081/api/v1`
-- Production: `https://simrule-api.example.com/api/v1`
+- WebSocket: `ws://localhost:8081/ws/simulations/{simulationId}`
 
-**WebSocket**:
-- `ws://localhost:8081/ws/simulations/{simulationId}`
+**Core Endpoints**:
+- Scenarios: `POST/GET/PUT/DELETE /api/v1/scenarios`
+- Simulations: `POST /api/v1/simulations`, `GET /api/v1/simulations/{id}`
+- Datasets: `POST/GET/DELETE /api/v1/datasets`
+- Coverage: `POST/GET /api/v1/coverage/{ruleSet}`
 
----
+**API Documentation**: See `SIMRULE_API_DOCUMENTATION.md` and `SimRule API OpenAPI v3.0.1.json`.
 
-## Feature Requirements
+## UI Component Conventions
+
+Components in `src/components/ui/` follow shadcn/ui patterns:
+- Built on Radix UI primitives
+- Styled with Tailwind CSS and `class-variance-authority`
+- Use `cn()` utility from `src/components/ui/utils.ts` for className merging
+
+## Critical Development Rules
+
+1. **PRESERVE DESIGN** - Do NOT modify existing CSS, colors, fonts, or visual styling
+2. **ADD FUNCTIONALITY** - Make static UI components dynamic with real API data
+3. **DON'T REBUILD** - Enhance existing code, don't replace it
+4. **KEEP COMPONENT STRUCTURE** - Maintain existing HTML layouts
+
+## Feature Requirements (Full Details Below)
 
 ### 1. Dashboard Page
 
