@@ -1,0 +1,116 @@
+// API Configuration for SimRule UI
+
+export interface ApiConfig {
+  baseUrl: string;
+  wsBaseUrl: string;
+  timeout: number;
+  retryAttempts: number;
+  retryDelay: number;
+}
+
+// Get environment variables with fallbacks
+const getEnvVar = (key: string, defaultValue: string): string => {
+  // @ts-expect-error - Vite uses import.meta.env
+  return import.meta.env?.[key] || defaultValue;
+};
+
+// Development configuration
+const developmentConfig: ApiConfig = {
+  baseUrl: 'http://localhost:8081/api/v1',
+  wsBaseUrl: 'ws://localhost:8081/ws',
+  timeout: 10000,
+  retryAttempts: 3,
+  retryDelay: 1000,
+};
+
+// Production configuration
+const productionConfig: ApiConfig = {
+  baseUrl: getEnvVar('VITE_API_BASE_URL', 'https://simrule-api.example.com/api/v1'),
+  wsBaseUrl: getEnvVar('VITE_WS_BASE_URL', 'wss://simrule-api.example.com/ws'),
+  timeout: 30000,
+  retryAttempts: 3,
+  retryDelay: 2000,
+};
+
+// Docker configuration
+const dockerConfig: ApiConfig = {
+  baseUrl: 'http://simrule-api:8081/api/v1',
+  wsBaseUrl: 'ws://simrule-api:8081/ws',
+  timeout: 15000,
+  retryAttempts: 3,
+  retryDelay: 1000,
+};
+
+// Get current environment
+const getEnvironment = (): 'development' | 'production' | 'docker' => {
+  const mode = getEnvVar('MODE', 'development');
+  if (mode === 'docker') return 'docker';
+  if (mode === 'production') return 'production';
+  return 'development';
+};
+
+// Export current configuration based on environment
+export const getApiConfig = (): ApiConfig => {
+  const env = getEnvironment();
+  switch (env) {
+    case 'production':
+      return productionConfig;
+    case 'docker':
+      return dockerConfig;
+    default:
+      return developmentConfig;
+  }
+};
+
+// Export default config
+export const apiConfig = getApiConfig();
+
+// API Endpoints
+export const API_ENDPOINTS = {
+  // Scenarios
+  SCENARIOS: '/scenarios',
+  SCENARIO_BY_ID: (id: string) => `/scenarios/${id}`,
+  SCENARIO_CLONE: (id: string) => `/scenarios/${id}/clone`,
+
+  // Simulations
+  SIMULATIONS: '/simulations',
+  SIMULATION_BY_ID: (id: string) => `/simulations/${id}`,
+
+  // Datasets
+  DATASETS: '/datasets',
+  DATASET_BY_ID: (id: string) => `/datasets/${id}`,
+
+  // Coverage
+  COVERAGE: (ruleSet: string) => `/coverage/${ruleSet}`,
+  COVERAGE_LATEST: (ruleSet: string) => `/coverage/${ruleSet}/latest`,
+
+  // Health
+  HEALTH: '/actuator/health',
+  METRICS: '/actuator/metrics',
+} as const;
+
+// WebSocket Endpoints
+export const WS_ENDPOINTS = {
+  SIMULATION: (simulationId: string) => `/simulations/${simulationId}`,
+} as const;
+
+// Request Headers
+export const getDefaultHeaders = (correlationId?: string, userId?: string): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (correlationId) {
+    headers['X-Correlation-ID'] = correlationId;
+  } else {
+    headers['X-Correlation-ID'] = crypto.randomUUID();
+  }
+
+  if (userId) {
+    headers['X-User-ID'] = userId;
+  } else {
+    headers['X-User-ID'] = 'system';
+  }
+
+  return headers;
+};
