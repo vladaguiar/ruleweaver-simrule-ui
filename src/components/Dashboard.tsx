@@ -1,50 +1,169 @@
-import React from 'react';
-import { TrendingUp, Activity, Target, CheckCircle, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { TrendingUp, Activity, Target, CheckCircle, Plus, RefreshCw, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useScenarioCounts } from '@/hooks/useScenarios';
+import { useSimulations, useSimulationStats } from '@/hooks/useSimulation';
+import { useAppContext } from '@/contexts/AppContext';
+import { simulationService } from '@/services';
+import type { SimulationResponse } from '@/types/api.types';
 
-const kpiData = [
-  { label: 'Total Scenarios', value: '156', trend: '+12%', icon: Activity, color: 'var(--color-primary)' },
-  { label: 'Active Sims', value: '12', status: 'Live', icon: Activity, color: 'var(--color-accent)' },
-  { label: 'Coverage Score', value: '87%', trend: '+5%', icon: Target, color: 'var(--color-success)' },
-  { label: 'Recent Runs', value: '45', status: '42 Pass', icon: CheckCircle, color: 'var(--color-info)' },
-];
+interface DashboardProps {
+  onNavigate: (page: string, params?: { scenarioId?: string; simulationId?: string }) => void;
+}
 
-const activityData = [
-  { date: 'Mon', tests: 24, passed: 22 },
-  { date: 'Tue', tests: 31, passed: 28 },
-  { date: 'Wed', tests: 28, passed: 26 },
-  { date: 'Thu', tests: 35, passed: 32 },
-  { date: 'Fri', tests: 42, passed: 38 },
-  { date: 'Sat', tests: 18, passed: 17 },
-  { date: 'Sun', tests: 15, passed: 15 },
-];
+// Helper function to format relative time
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-const recentSimulations = [
-  { name: 'Customer Validation', status: 'pass', duration: '2.4s', results: '45/45' },
-  { name: 'Order Processing', status: 'fail', duration: '3.1s', results: '23/30' },
-  { name: 'Pricing Rules', status: 'warning', duration: '1.8s', results: '28/30' },
-  { name: 'Account Setup', status: 'pass', duration: '1.2s', results: '20/20' },
-  { name: 'Shipping Calculation', status: 'pass', duration: '2.7s', results: '35/35' },
-];
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
+}
 
-const coverageData = [
-  { name: 'Covered', value: 136, color: '#C3E770' },
-  { name: 'Untested', value: 20, color: '#EF6F53' },
-];
+// Helper to determine status from simulation
+function getSimulationStatus(sim: SimulationResponse): 'pass' | 'fail' | 'warning' {
+  if (!sim.metrics) return 'warning';
+  if (sim.status === 'FAILED') return 'fail';
+  if (sim.metrics.successRate >= 95) return 'pass';
+  if (sim.metrics.successRate >= 80) return 'warning';
+  return 'fail';
+}
 
-export function Dashboard() {
+export function Dashboard({ onNavigate }: DashboardProps) {
+  // Get data from hooks
+  const { counts: scenarioCounts, loading: scenariosLoading } = useScenarioCounts();
+  const { stats: simStats, loading: statsLoading } = useSimulationStats();
+  const { apiStatus, checkApiConnection } = useAppContext();
+
+  // Recent simulations state
+  const [recentSimulations, setRecentSimulations] = useState<SimulationResponse[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Load recent simulations
+  useEffect(() => {
+    const loadRecent = async () => {
+      try {
+        const recent = await simulationService.getRecent(5);
+        setRecentSimulations(recent);
+      } catch (error) {
+        console.error('Failed to load recent simulations:', error);
+      } finally {
+        setLoadingRecent(false);
+      }
+    };
+    loadRecent();
+  }, []);
+
+  // Refresh function
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await checkApiConnection();
+    try {
+      const recent = await simulationService.getRecent(5);
+      setRecentSimulations(recent);
+    } catch (error) {
+      console.error('Failed to refresh:', error);
+    }
+    setRefreshing(false);
+  };
+
+  // Build KPI data from actual state
+  const kpiData = [
+    {
+      label: 'Total Scenarios',
+      value: scenariosLoading ? '...' : String(scenarioCounts.all),
+      trend: '+12%',
+      icon: Activity,
+      color: 'var(--color-primary)',
+    },
+    {
+      label: 'Active Sims',
+      value: statsLoading ? '...' : String(simStats.running),
+      status: simStats.running > 0 ? 'Live' : 'None',
+      icon: Activity,
+      color: 'var(--color-accent)',
+    },
+    {
+      label: 'Coverage Score',
+      value: '87%', // Would come from coverage API
+      trend: '+5%',
+      icon: Target,
+      color: 'var(--color-success)',
+    },
+    {
+      label: 'Recent Runs',
+      value: statsLoading ? '...' : String(simStats.completed),
+      status: `${Math.round(simStats.avgPassRate)}% Pass`,
+      icon: CheckCircle,
+      color: 'var(--color-info)',
+    },
+  ];
+
+  // Mock activity data - in production would come from API
+  const activityData = [
+    { date: 'Mon', tests: 24, passed: 22 },
+    { date: 'Tue', tests: 31, passed: 28 },
+    { date: 'Wed', tests: 28, passed: 26 },
+    { date: 'Thu', tests: 35, passed: 32 },
+    { date: 'Fri', tests: 42, passed: 38 },
+    { date: 'Sat', tests: 18, passed: 17 },
+    { date: 'Sun', tests: 15, passed: 15 },
+  ];
+
+  // Coverage data - would come from coverage API
+  const coverageData = [
+    { name: 'Covered', value: 136, color: '#C3E770' },
+    { name: 'Untested', value: 20, color: '#EF6F53' },
+  ];
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1>Dashboard</h1>
-        <button
-          className="flex items-center gap-2 px-6 py-2 bg-[var(--color-accent)] text-white rounded hover:bg-[#FC7857] transition-colors"
-          style={{ boxShadow: 'var(--shadow-1)', fontSize: '14px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}
-        >
-          <Plus size={18} />
-          New Scenario
-        </button>
+        <div className="flex items-center gap-4">
+          <h1>Dashboard</h1>
+          {/* API Status Indicator */}
+          <div className="flex items-center gap-2">
+            {apiStatus === 'connected' ? (
+              <span className="flex items-center gap-1 px-2 py-1 rounded text-xs" style={{ backgroundColor: '#E8F5E9', color: '#1B5E20' }}>
+                <Wifi size={14} /> Connected
+              </span>
+            ) : apiStatus === 'checking' ? (
+              <span className="flex items-center gap-1 px-2 py-1 rounded text-xs" style={{ backgroundColor: '#FFF3E0', color: '#5D4037' }}>
+                <RefreshCw size={14} className="animate-spin" /> Checking...
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 px-2 py-1 rounded text-xs" style={{ backgroundColor: '#FFEBEE', color: '#C62828' }}>
+                <WifiOff size={14} /> Disconnected
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 border rounded hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
+            style={{ borderColor: 'var(--color-border)', fontSize: '14px' }}
+          >
+            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+          <button
+            onClick={() => onNavigate('scenario-editor')}
+            className="flex items-center gap-2 px-6 py-2 bg-[var(--color-accent)] text-white rounded hover:bg-[#FC7857] transition-colors"
+            style={{ boxShadow: 'var(--shadow-1)', fontSize: '14px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}
+          >
+            <Plus size={18} />
+            New Scenario
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -157,16 +276,32 @@ export function Dashboard() {
       <div className="bg-[var(--color-background)] rounded-lg p-6" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
         <h3 className="mb-4">Quick Actions</h3>
         <div className="flex flex-wrap gap-3">
-          <button className="px-6 py-3 bg-[var(--color-primary)] text-white rounded hover:bg-[#1D4261] transition-colors" style={{ fontSize: '14px', fontWeight: 500 }}>
+          <button
+            onClick={() => onNavigate('scenario-editor')}
+            className="px-6 py-3 bg-[var(--color-primary)] text-white rounded hover:bg-[#1D4261] transition-colors"
+            style={{ fontSize: '14px', fontWeight: 500 }}
+          >
             Create Scenario
           </button>
-          <button className="px-6 py-3 bg-[var(--color-accent)] text-white rounded hover:bg-[#FC7857] transition-colors" style={{ fontSize: '14px', fontWeight: 500 }}>
+          <button
+            onClick={() => onNavigate('simulations')}
+            className="px-6 py-3 bg-[var(--color-accent)] text-white rounded hover:bg-[#FC7857] transition-colors"
+            style={{ fontSize: '14px', fontWeight: 500 }}
+          >
             Run Simulation
           </button>
-          <button className="px-6 py-3 border text-[var(--color-primary)] rounded hover:bg-[var(--color-surface)] transition-colors" style={{ fontSize: '14px', fontWeight: 500, borderColor: 'var(--color-border)' }}>
+          <button
+            onClick={() => onNavigate('coverage')}
+            className="px-6 py-3 border text-[var(--color-primary)] rounded hover:bg-[var(--color-surface)] transition-colors"
+            style={{ fontSize: '14px', fontWeight: 500, borderColor: 'var(--color-border)' }}
+          >
             View Reports
           </button>
-          <button className="px-6 py-3 border text-[var(--color-primary)] rounded hover:bg-[var(--color-surface)] transition-colors" style={{ fontSize: '14px', fontWeight: 500, borderColor: 'var(--color-border)' }}>
+          <button
+            onClick={() => onNavigate('datasets')}
+            className="px-6 py-3 border text-[var(--color-primary)] rounded hover:bg-[var(--color-surface)] transition-colors"
+            style={{ fontSize: '14px', fontWeight: 500, borderColor: 'var(--color-border)' }}
+          >
             Manage Datasets
           </button>
         </div>
@@ -176,58 +311,94 @@ export function Dashboard() {
       <div className="bg-[var(--color-background)] rounded-lg p-6" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)', marginTop: '5px' }}>
         <div className="flex justify-between items-center mb-4">
           <h3>Recent Simulations</h3>
-          <button className="text-[var(--color-primary)] hover:underline" style={{ fontSize: '14px', fontWeight: 500 }}>
+          <button
+            onClick={() => onNavigate('results')}
+            className="text-[var(--color-primary)] hover:underline"
+            style={{ fontSize: '14px', fontWeight: 500 }}
+          >
             View All
           </button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
-                <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Scenario Name</th>
-                <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Status</th>
-                <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Duration</th>
-                <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Results</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentSimulations.map((sim, index) => (
-                <tr
-                  key={index}
-                  className="border-b hover:bg-[var(--color-surface)] cursor-pointer transition-colors"
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  <td className="p-4" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{sim.name}</td>
-                  <td className="p-4">
-                    <span
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full"
-                      style={{
-                        backgroundColor:
-                          sim.status === 'pass'
-                            ? '#C3E770'
-                            : sim.status === 'fail'
-                            ? '#EF6F53'
-                            : '#F7EA73',
-                        color:
-                          sim.status === 'pass'
-                            ? '#1B5E20'
-                            : sim.status === 'fail'
-                            ? '#FFFFFF'
-                            : '#5D4037',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {sim.status === 'pass' ? '✅' : sim.status === 'fail' ? '❌' : '⚠️'}
-                      {sim.status === 'pass' ? 'Pass' : sim.status === 'fail' ? 'Fail' : 'Warning'}
-                    </span>
-                  </td>
-                  <td className="p-4" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{sim.duration}</td>
-                  <td className="p-4" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-primary)' }}>{sim.results}</td>
+          {loadingRecent ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="animate-spin" size={24} style={{ color: 'var(--color-primary)' }} />
+              <span className="ml-2" style={{ color: 'var(--color-text-secondary)' }}>Loading simulations...</span>
+            </div>
+          ) : recentSimulations.length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle size={48} style={{ color: 'var(--color-text-muted)', margin: '0 auto 16px' }} />
+              <p style={{ color: 'var(--color-text-secondary)' }}>No simulations yet</p>
+              <button
+                onClick={() => onNavigate('simulations')}
+                className="mt-4 px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[#1D4261] transition-colors"
+                style={{ fontSize: '14px' }}
+              >
+                Run Your First Simulation
+              </button>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
+                  <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Simulation Name</th>
+                  <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Status</th>
+                  <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Duration</th>
+                  <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Results</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentSimulations.map((sim) => {
+                  const status = getSimulationStatus(sim);
+                  const duration = sim.metrics
+                    ? simulationService.formatDuration(sim.metrics.totalDurationMs)
+                    : '-';
+                  const results = sim.metrics
+                    ? `${sim.metrics.scenariosPassed}/${sim.metrics.totalScenarios}`
+                    : '-';
+
+                  return (
+                    <tr
+                      key={sim.id}
+                      onClick={() => onNavigate('results', { simulationId: sim.id })}
+                      className="border-b hover:bg-[var(--color-surface)] cursor-pointer transition-colors"
+                      style={{ borderColor: 'var(--color-border)' }}
+                    >
+                      <td className="p-4" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                        {sim.name || `Simulation ${sim.id.slice(0, 8)}`}
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className="inline-flex items-center gap-1 px-3 py-1 rounded-full"
+                          style={{
+                            backgroundColor:
+                              status === 'pass'
+                                ? '#C3E770'
+                                : status === 'fail'
+                                ? '#EF6F53'
+                                : '#F7EA73',
+                            color:
+                              status === 'pass'
+                                ? '#1B5E20'
+                                : status === 'fail'
+                                ? '#FFFFFF'
+                                : '#5D4037',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                          }}
+                        >
+                          {status === 'pass' ? '✅' : status === 'fail' ? '❌' : '⚠️'}
+                          {status === 'pass' ? 'Pass' : status === 'fail' ? 'Fail' : 'Warning'}
+                        </span>
+                      </td>
+                      <td className="p-4" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{duration}</td>
+                      <td className="p-4" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-primary)' }}>{results}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
