@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Play, Pause, Square, CheckCircle, XCircle, AlertTriangle, RefreshCw, Search, ChevronDown, ChevronUp, Download, Settings2 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { useScenarios } from '@/hooks/useScenarios';
+import { useDebounce } from '@/hooks/useDebounce';
 import { simulationService, scenarioService } from '@/services';
 import { websocketService, type WebSocketStatus, type SimulationWebSocket } from '@/services/websocket.service';
 import { useAppContext } from '@/contexts/AppContext';
@@ -56,11 +57,15 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
   const [loading, setLoading] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [scenarioSearch, setScenarioSearch] = useState('');
+  const debouncedSearch = useDebounce(scenarioSearch, 300); // Debounce search input
   const [ruleSetFilter, setRuleSetFilter] = useState<string>('all');
   const [availableRuleSets, setAvailableRuleSets] = useState<string[]>([]);
 
   // Timer ref
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Simulation ID ref for cleanup (avoids stale closure issues)
+  const simulationIdRef = useRef<string | null>(null);
 
   // Load available scenarios
   useEffect(() => {
@@ -87,12 +92,15 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
     loadScenarios();
   }, [addNotification]);
 
-  // Filter scenarios
-  const filteredScenarios = availableScenarios.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(scenarioSearch.toLowerCase());
-    const matchesRuleSet = ruleSetFilter === 'all' || s.ruleSet === ruleSetFilter;
-    return matchesSearch && matchesRuleSet;
-  });
+  // Filter scenarios - memoized to avoid recalculation on every render
+  // Uses debounced search value to prevent excessive filtering during typing
+  const filteredScenarios = useMemo(() => {
+    return availableScenarios.filter(s => {
+      const matchesSearch = s.name.toLowerCase().includes(debouncedSearch.toLowerCase());
+      const matchesRuleSet = ruleSetFilter === 'all' || s.ruleSet === ruleSetFilter;
+      return matchesSearch && matchesRuleSet;
+    });
+  }, [availableScenarios, debouncedSearch, ruleSetFilter]);
 
   // WebSocket connection ref
   const wsConnectionRef = useRef<SimulationWebSocket | null>(null);
@@ -177,15 +185,21 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
     }
   };
 
-  // Cleanup on unmount
+  // Cleanup on unmount - use refs to avoid stale closure issues
   useEffect(() => {
     return () => {
-      stopTimer();
-      if (simulation) {
-        websocketService.disconnectFromSimulation(simulation.id);
+      // Always stop timer on unmount
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      // Always disconnect WebSocket on unmount using ref
+      if (simulationIdRef.current) {
+        websocketService.disconnectFromSimulation(simulationIdRef.current);
+        simulationIdRef.current = null;
       }
     };
-  }, [simulation]);
+  }, []); // Empty dependency array ensures cleanup only runs on unmount
 
   // Start simulation
   const handleStart = async () => {
@@ -217,11 +231,17 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
       const name = simulationName || `Simulation - ${new Date().toLocaleString()}`;
       const response = await simulationService.executeScenarios(
         selectedScenarios,
-        name,
-        executionMode
+        {
+          name,
+          executionMode,
+          concurrency,
+          timeoutSeconds: timeout,
+        }
       );
 
       setSimulation(response);
+      // Store simulation ID in ref for cleanup
+      simulationIdRef.current = response.id;
 
       // Connect WebSocket for real-time updates
       wsConnectionRef.current = websocketService.connectToSimulation(response.id, {
@@ -272,8 +292,9 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
 
   // Stop simulation
   const handleStop = async () => {
-    if (simulation) {
-      websocketService.disconnectFromSimulation(simulation.id);
+    if (simulationIdRef.current) {
+      websocketService.disconnectFromSimulation(simulationIdRef.current);
+      simulationIdRef.current = null;
     }
     wsConnectionRef.current = null;
     stopTimer();

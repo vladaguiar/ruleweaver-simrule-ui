@@ -145,8 +145,13 @@ export function useSimulationProgress(simulationId: string | null) {
   const [error, setError] = useState<string | null>(null);
 
   const startTimeRef = useRef<number>(Date.now());
+  // Track mounted state to prevent setState on unmounted component
+  const isMountedRef = useRef<boolean>(true);
 
   const handleMessage = useCallback((message: SimulationWebSocketMessage) => {
+    // Prevent setState on unmounted component
+    if (!isMountedRef.current) return;
+
     const now = new Date().toLocaleTimeString('en-US', { hour12: false });
 
     switch (message.type) {
@@ -216,7 +221,11 @@ export function useSimulationProgress(simulationId: string | null) {
         ]);
         // Refresh simulation data to get final results
         if (simulationId) {
-          simulationService.getById(simulationId).then(setSimulation);
+          simulationService.getById(simulationId).then((sim) => {
+            if (isMountedRef.current) {
+              setSimulation(sim);
+            }
+          });
         }
         break;
 
@@ -233,6 +242,14 @@ export function useSimulationProgress(simulationId: string | null) {
         break;
     }
   }, [simulationId]);
+
+  // Set mounted state on mount/unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Connect to WebSocket when simulationId changes
   useEffect(() => {
@@ -262,6 +279,8 @@ export function useSimulationProgress(simulationId: string | null) {
     setLoading(true);
     simulationService.getById(simulationId)
       .then((sim) => {
+        // Check if still mounted before setting state
+        if (!isMountedRef.current) return;
         setSimulation(sim);
         if (sim.scenarioIds) {
           setProgress((prev) => ({
@@ -271,18 +290,27 @@ export function useSimulationProgress(simulationId: string | null) {
         }
       })
       .catch((err) => {
+        if (!isMountedRef.current) return;
         setError(err.message);
       })
       .finally(() => {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       });
 
     // Connect to WebSocket
     websocketService.connectToSimulation(simulationId, {
       onMessage: handleMessage,
-      onStatusChange: setWsStatus,
+      onStatusChange: (status) => {
+        if (isMountedRef.current) {
+          setWsStatus(status);
+        }
+      },
       onError: () => {
-        setError('WebSocket connection failed');
+        if (isMountedRef.current) {
+          setError('WebSocket connection failed');
+        }
       },
     });
 
@@ -295,10 +323,12 @@ export function useSimulationProgress(simulationId: string | null) {
   useEffect(() => {
     if (simulation?.status === 'RUNNING') {
       const interval = setInterval(() => {
-        setProgress((prev) => ({
-          ...prev,
-          elapsedTimeMs: Date.now() - startTimeRef.current,
-        }));
+        if (isMountedRef.current) {
+          setProgress((prev) => ({
+            ...prev,
+            elapsedTimeMs: Date.now() - startTimeRef.current,
+          }));
+        }
       }, 1000);
       return () => clearInterval(interval);
     }
