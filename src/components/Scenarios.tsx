@@ -61,17 +61,24 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
     setLoading(true);
     setError(null);
     try {
-      const filters: Record<string, string> = {};
+      const filters: Record<string, string | undefined> = {};
       if (statusFilter !== 'all') filters.status = statusFilter;
       if (ruleSetFilter !== 'all') filters.ruleSet = ruleSetFilter;
-      if (selectedTags.length > 0) filters.tags = selectedTags.join(',');
 
-      const response = await scenarioService.getAll(currentPage - 1, pageSize, filters);
-      setScenarios(response.content);
-      setTotalPages(response.totalPages);
-      setTotalItems(response.totalElements);
+      // API returns array, not paginated response - handle pagination client-side
+      const allScenarios = await scenarioService.getAll(filters as any);
+
+      // Client-side pagination
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedScenarios = allScenarios.slice(startIndex, endIndex);
+
+      setScenarios(paginatedScenarios);
+      setTotalPages(Math.ceil(allScenarios.length / pageSize) || 1);
+      setTotalItems(allScenarios.length);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load scenarios');
+      setScenarios([]);
     } finally {
       setLoading(false);
     }

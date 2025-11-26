@@ -57,18 +57,26 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
   const loadSimulations = useCallback(async () => {
     setLoadingList(true);
     try {
-      const filters: Record<string, string> = {};
+      const filters: Record<string, string | undefined> = {};
       if (statusFilter !== 'all') filters.status = statusFilter;
 
-      const response = await simulationService.getAll(currentPage - 1, pageSize, filters);
-      setSimulations(response.content);
-      setTotalPages(response.totalPages);
+      // API returns array directly, not paginated response - handle pagination client-side
+      const allSimulations = await simulationService.getAll(filters as any);
+
+      // Client-side pagination
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedSimulations = allSimulations.slice(startIndex, endIndex);
+
+      setSimulations(paginatedSimulations);
+      setTotalPages(Math.ceil(allSimulations.length / pageSize) || 1);
     } catch (e) {
       addNotification({
         type: 'error',
         title: 'Failed to Load',
         message: 'Could not load simulations',
       });
+      setSimulations([]);
     } finally {
       setLoadingList(false);
     }

@@ -67,17 +67,19 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
     const loadScenarios = async () => {
       setLoading(true);
       try {
-        const response = await scenarioService.getAll(0, 1000, { status: 'ACTIVE' });
-        setAvailableScenarios(response.content);
+        // API returns array directly, not paginated response
+        const scenarios = await scenarioService.getAll({ status: 'ACTIVE' });
+        setAvailableScenarios(scenarios || []);
 
         const ruleSets = await scenarioService.getRuleSets();
-        setAvailableRuleSets(ruleSets);
+        setAvailableRuleSets(ruleSets || []);
       } catch (e) {
         addNotification({
           type: 'error',
           title: 'Failed to Load',
           message: 'Could not load scenarios',
         });
+        setAvailableScenarios([]);
       } finally {
         setLoading(false);
       }
