@@ -1,5 +1,6 @@
 // useDatasets Hook - Custom hook for dataset management
 
+import * as XLSX from 'xlsx';
 import { useState, useEffect, useCallback } from 'react';
 import { datasetService } from '@/services';
 import type { DatasetResponse, UploadDatasetRequest, DatasetFilters } from '@/types/api.types';
@@ -250,8 +251,19 @@ export function useDatasetPreview(file: File | null) {
           records = datasetService.parseCSV(content);
         } else if (format === 'JSON') {
           records = datasetService.parseJSON(content);
+        } else if (format === 'EXCEL') {
+          const arrayBuffer = await file.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          if (!sheetName) {
+            throw new Error('Excel file has no sheets');
+          }
+          const worksheet = workbook.Sheets[sheetName];
+          records = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+            defval: null,
+          });
         } else {
-          throw new Error('Excel preview not supported');
+          throw new Error(`Unsupported format: ${format}`);
         }
 
         // Get columns from first record

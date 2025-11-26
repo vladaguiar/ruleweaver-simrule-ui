@@ -1,6 +1,7 @@
 // Dataset Service for SimRule UI
 // Handles all dataset-related API operations
 
+import * as XLSX from 'xlsx';
 import { apiService, RequestOptions } from './api.service';
 import { API_ENDPOINTS } from '@/config/api.config';
 import type {
@@ -20,9 +21,19 @@ const VALID_HEADER_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const DANGEROUS_PATTERNS = [
   /<script/i,
   /javascript:/i,
-  /on\w+=/i, // onclick=, onerror=, etc.
-  /data:/i,
+  /on\w+\s*=/i, // onclick=, onerror=, etc. (with optional whitespace)
+  /data:\s*text\/html/i, // data:text/html specifically (data: alone too aggressive)
   /vbscript:/i,
+  /<\s*iframe/i,
+  /<\s*object/i,
+  /<\s*embed/i,
+  /<\s*form/i,
+  /<\s*input/i,
+  /<\s*img[^>]+onerror/i,
+  /expression\s*\(/i, // CSS expression()
+  /url\s*\(\s*["']?\s*javascript/i, // url(javascript:...)
+  /&#\d+;?/i, // Numeric HTML entities
+  /&#x[0-9a-f]+;?/i, // Hex HTML entities
 ];
 
 class DatasetService {
@@ -78,9 +89,29 @@ class DatasetService {
     // Check for dangerous patterns
     for (const pattern of DANGEROUS_PATTERNS) {
       if (pattern.test(value)) {
-        console.warn(`Potentially dangerous content detected and sanitized: ${value.substring(0, 50)}...`);
-        // Remove potentially dangerous content
-        return value.replace(/<[^>]*>/g, '').replace(/javascript:/gi, '').replace(/on\w+=/gi, '');
+        // Log that sanitization occurred without exposing the actual content
+        console.warn('Potentially dangerous content detected and sanitized in dataset value');
+        // Comprehensive sanitization
+        let sanitized = value
+          // Remove HTML tags
+          .replace(/<[^>]*>/g, '')
+          // Remove javascript: protocol
+          .replace(/javascript\s*:/gi, '')
+          // Remove vbscript: protocol
+          .replace(/vbscript\s*:/gi, '')
+          // Remove event handlers
+          .replace(/on\w+\s*=/gi, '')
+          // Remove data:text/html URIs
+          .replace(/data\s*:\s*text\/html/gi, '')
+          // Decode and remove numeric HTML entities
+          .replace(/&#(\d+);?/g, '')
+          // Decode and remove hex HTML entities
+          .replace(/&#x([0-9a-f]+);?/gi, '')
+          // Remove CSS expressions
+          .replace(/expression\s*\(/gi, '')
+          // Remove javascript in url()
+          .replace(/url\s*\(\s*["']?\s*javascript/gi, 'url(');
+        return sanitized;
       }
     }
     return value;
@@ -159,7 +190,9 @@ class DatasetService {
    * Parse CSV content to records with validation and sanitization
    */
   parseCSV(csvContent: string): Record<string, unknown>[] {
-    const lines = csvContent.trim().split('\n');
+    // Normalize line endings (handle Windows \r\n, old Mac \r, and Unix \n)
+    const normalizedContent = csvContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = normalizedContent.trim().split('\n');
     if (lines.length < 2) {
       throw new Error('CSV file must have at least a header row and one data row');
     }
@@ -199,27 +232,42 @@ class DatasetService {
   }
 
   /**
-   * Parse a single CSV line handling quoted values
+   * Parse a single CSV line handling quoted values and escaped quotes
    */
   private parseCSVLine(line: string): string[] {
     const values: string[] = [];
     let current = '';
     let inQuotes = false;
+    let i = 0;
 
-    for (let i = 0; i < line.length; i++) {
+    while (i < line.length) {
       const char = line[i];
+      const nextChar = line[i + 1];
 
       if (char === '"') {
-        inQuotes = !inQuotes;
+        if (!inQuotes) {
+          // Starting a quoted field
+          inQuotes = true;
+        } else if (nextChar === '"') {
+          // Escaped quote ("") - add single quote and skip next char
+          current += '"';
+          i++;
+        } else {
+          // Ending a quoted field
+          inQuotes = false;
+        }
       } else if (char === ',' && !inQuotes) {
-        values.push(current.trim().replace(/^["']|["']$/g, ''));
+        // End of field
+        values.push(current.trim());
         current = '';
       } else {
         current += char;
       }
+      i++;
     }
 
-    values.push(current.trim().replace(/^["']|["']$/g, ''));
+    // Don't forget the last field
+    values.push(current.trim());
     return values;
   }
 
@@ -263,6 +311,44 @@ class DatasetService {
     }
 
     throw new Error('Invalid JSON format: expected array or object');
+  }
+
+  /**
+   * Parse Excel file to records
+   */
+  async parseExcel(file: File): Promise<Record<string, unknown>[]> {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+    // Get first sheet
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) {
+      throw new Error('Excel file has no sheets');
+    }
+
+    const worksheet = workbook.Sheets[sheetName];
+
+    // Convert to JSON with header row
+    const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+      defval: null, // Default value for empty cells
+    });
+
+    if (records.length === 0) {
+      throw new Error('Excel sheet is empty or has no data rows');
+    }
+
+    // Sanitize string values in records
+    return records.map(record => {
+      const sanitizedRecord: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(record)) {
+        if (typeof value === 'string') {
+          sanitizedRecord[key] = this.sanitizeValue(value);
+        } else {
+          sanitizedRecord[key] = value;
+        }
+      }
+      return sanitizedRecord;
+    });
   }
 
   /**
@@ -315,8 +401,11 @@ class DatasetService {
         }
         break;
       case 'EXCEL':
-        // Excel parsing would require a library like xlsx
-        throw new Error('Excel parsing not yet implemented - please use JSON or CSV');
+        records = await this.parseExcel(file);
+        if (records.length > MAX_RECORDS) {
+          throw new Error(`Excel contains ${records.length} records but maximum allowed is ${MAX_RECORDS}`);
+        }
+        break;
       default:
         throw new Error(`Unsupported format: ${format}`);
     }
