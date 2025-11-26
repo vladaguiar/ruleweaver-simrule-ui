@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Activity, Target, CheckCircle, Plus, RefreshCw, AlertCircle, Wifi, WifiOff, Pause, Play } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Activity, Target, CheckCircle, Plus, RefreshCw, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useScenarioCounts } from '@/hooks/useScenarios';
 import { useSimulations, useSimulationStats } from '@/hooks/useSimulation';
@@ -43,7 +43,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const { counts: scenarioCounts, loading: scenariosLoading } = useScenarioCounts();
   const { stats: simStats, loading: statsLoading } = useSimulationStats();
   const { activityData, loading: activityLoading } = useActivityStats();
-  const { apiStatus, checkApiConnection, settings } = useAppContext();
+  const { apiStatus, checkApiConnection } = useAppContext();
 
   // Recent simulations state
   const [recentSimulations, setRecentSimulations] = useState<SimulationResponse[]>([]);
@@ -59,12 +59,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     total: number;
   } | null>(null);
   const [coverageLoading, setCoverageLoading] = useState(true);
-
-  // Auto-refresh state
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const [timeUntilRefresh, setTimeUntilRefresh] = useState(settings.autoRefreshInterval / 1000);
-  const autoRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // KPI trends state
   const [trends, setTrends] = useState<TrendsResponse | null>(null);
@@ -257,50 +251,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       console.error('Failed to refresh:', error);
     }
     setRefreshing(false);
-    // Reset countdown after refresh
-    setTimeUntilRefresh(settings.autoRefreshInterval / 1000);
-  }, [checkApiConnection, settings.autoRefreshInterval]);
-
-  // Toggle auto-refresh
-  const toggleAutoRefresh = useCallback(() => {
-    setAutoRefreshEnabled(prev => !prev);
-  }, []);
-
-  // Auto-refresh effect
-  useEffect(() => {
-    // Clear existing timers
-    if (autoRefreshTimerRef.current) {
-      clearTimeout(autoRefreshTimerRef.current);
-    }
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-    }
-
-    if (!autoRefreshEnabled || settings.autoRefreshInterval <= 0) {
-      return;
-    }
-
-    // Set up auto-refresh timer
-    autoRefreshTimerRef.current = setTimeout(() => {
-      handleRefresh();
-    }, settings.autoRefreshInterval);
-
-    // Set up countdown timer (updates every second)
-    setTimeUntilRefresh(settings.autoRefreshInterval / 1000);
-    countdownTimerRef.current = setInterval(() => {
-      setTimeUntilRefresh(prev => Math.max(0, prev - 1));
-    }, 1000);
-
-    // Cleanup
-    return () => {
-      if (autoRefreshTimerRef.current) {
-        clearTimeout(autoRefreshTimerRef.current);
-      }
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-      }
-    };
-  }, [autoRefreshEnabled, settings.autoRefreshInterval, handleRefresh]);
+  }, [checkApiConnection]);
 
   // Helper to get trend data from API response
   const getTrendInfo = (): { change: number; direction: TrendDirection } | null => {
@@ -380,27 +331,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Auto-refresh indicator and toggle */}
-          <div className="flex items-center gap-2 mr-2">
-            <button
-              onClick={toggleAutoRefresh}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors"
-              style={{
-                backgroundColor: autoRefreshEnabled ? 'var(--color-success)' : 'var(--color-surface)',
-                color: autoRefreshEnabled ? 'white' : 'var(--color-text-secondary)',
-                fontSize: '12px',
-                border: '1px solid var(--color-border)',
-              }}
-              title={autoRefreshEnabled ? 'Click to pause auto-refresh' : 'Click to enable auto-refresh'}
-            >
-              {autoRefreshEnabled ? <Pause size={14} /> : <Play size={14} />}
-              {autoRefreshEnabled ? (
-                <span>Auto ({timeUntilRefresh}s)</span>
-              ) : (
-                <span>Paused</span>
-              )}
-            </button>
-          </div>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
