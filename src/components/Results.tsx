@@ -57,11 +57,11 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
   const loadSimulations = useCallback(async () => {
     setLoadingList(true);
     try {
-      const filters: Record<string, string | undefined> = {};
-      if (statusFilter !== 'all') filters.status = statusFilter;
+      // Build proper filter object
+      const filters = statusFilter !== 'all' ? { status: statusFilter } : undefined;
 
       // API returns array directly, not paginated response - handle pagination client-side
-      const allSimulations = await simulationService.getAll(filters as any);
+      const allSimulations = await simulationService.getAll(filters);
 
       // Client-side pagination
       const startIndex = (currentPage - 1) * pageSize;

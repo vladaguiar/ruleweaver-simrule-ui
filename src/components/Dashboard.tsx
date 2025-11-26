@@ -46,19 +46,35 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Load recent simulations
+  // Load recent simulations with AbortController for cleanup
   useEffect(() => {
+    const abortController = new AbortController();
+
     const loadRecent = async () => {
       try {
-        const recent = await simulationService.getRecent(5);
-        setRecentSimulations(recent);
+        const recent = await simulationService.getRecent(5, { signal: abortController.signal });
+        // Only update state if not aborted
+        if (!abortController.signal.aborted) {
+          setRecentSimulations(recent);
+        }
       } catch (error) {
+        // Ignore abort errors
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
         console.error('Failed to load recent simulations:', error);
       } finally {
-        setLoadingRecent(false);
+        if (!abortController.signal.aborted) {
+          setLoadingRecent(false);
+        }
       }
     };
     loadRecent();
+
+    // Cleanup: abort request if component unmounts
+    return () => {
+      abortController.abort();
+    };
   }, []);
 
   // Refresh function

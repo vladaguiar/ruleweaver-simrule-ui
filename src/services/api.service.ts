@@ -27,7 +27,7 @@ class ApiService {
     this.defaultTimeout = apiConfig.timeout;
   }
 
-  private async handleResponse<T>(response: Response): Promise<T> {
+  private async handleResponse<T>(response: Response, method: string, url: string): Promise<T> {
     if (!response.ok) {
       const errorBody = await response.text();
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
@@ -41,11 +41,21 @@ class ApiService {
         errorDetails = errorBody;
       }
 
+      const correlationId = response.headers.get('X-Correlation-ID') || undefined;
+
+      // Log the error for debugging
+      console.error(`[API Error] ${method} ${url}`, {
+        status: response.status,
+        message: errorMessage,
+        correlationId,
+        details: errorDetails,
+      });
+
       const error: ApiError = {
         status: response.status,
         message: errorMessage,
         details: errorDetails,
-        correlationId: response.headers.get('X-Correlation-ID') || undefined,
+        correlationId,
       };
 
       throw error;
@@ -94,13 +104,21 @@ class ApiService {
       options.signal
     );
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
-      signal,
-    });
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal,
+      });
 
-    return this.handleResponse<T>(response);
+      return this.handleResponse<T>(response, 'GET', url);
+    } catch (error) {
+      // Log network errors and timeouts
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error(`[API Network Error] GET ${url}`, error.message);
+      }
+      throw error;
+    }
   }
 
   async post<T, B = unknown>(endpoint: string, body: B, options: RequestOptions = {}): Promise<T> {
@@ -115,14 +133,21 @@ class ApiService {
       options.signal
     );
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-      signal,
-    });
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal,
+      });
 
-    return this.handleResponse<T>(response);
+      return this.handleResponse<T>(response, 'POST', url);
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error(`[API Network Error] POST ${url}`, error.message);
+      }
+      throw error;
+    }
   }
 
   async put<T, B = unknown>(endpoint: string, body: B, options: RequestOptions = {}): Promise<T> {
@@ -137,14 +162,21 @@ class ApiService {
       options.signal
     );
 
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(body),
-      signal,
-    });
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(body),
+        signal,
+      });
 
-    return this.handleResponse<T>(response);
+      return this.handleResponse<T>(response, 'PUT', url);
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error(`[API Network Error] PUT ${url}`, error.message);
+      }
+      throw error;
+    }
   }
 
   async delete<T = void>(endpoint: string, options: RequestOptions = {}): Promise<T> {
@@ -159,13 +191,20 @@ class ApiService {
       options.signal
     );
 
-    const response = await fetch(url, {
-      method: 'DELETE',
-      headers,
-      signal,
-    });
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers,
+        signal,
+      });
 
-    return this.handleResponse<T>(response);
+      return this.handleResponse<T>(response, 'DELETE', url);
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error(`[API Network Error] DELETE ${url}`, error.message);
+      }
+      throw error;
+    }
   }
 
   // Health check

@@ -93,7 +93,12 @@ export function AppProvider({ children }: AppProviderProps) {
   const [selectedRuleSet, setSelectedRuleSet] = useState<string | null>(settings.defaultRuleSet || null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // User info (would come from auth in production)
+  // TODO: Replace hardcoded user with actual authentication system
+  // In production, user info should come from:
+  // - OAuth2/OIDC provider (e.g., Keycloak, Auth0, Okta)
+  // - JWT token from authentication service
+  // - Session-based auth with backend
+  // Current hardcoded values are for development/testing only
   const userId = 'system';
   const userName = 'Test User';
 
