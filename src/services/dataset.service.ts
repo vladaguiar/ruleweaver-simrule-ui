@@ -10,7 +10,98 @@ import type {
   DatasetFormat,
 } from '@/types/api.types';
 
+// Validation constants
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const MAX_RECORDS = 10000;
+const MAX_HEADER_LENGTH = 100;
+const VALID_HEADER_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+// Characters that could indicate XSS or injection attacks
+const DANGEROUS_PATTERNS = [
+  /<script/i,
+  /javascript:/i,
+  /on\w+=/i, // onclick=, onerror=, etc.
+  /data:/i,
+  /vbscript:/i,
+];
+
 class DatasetService {
+  /**
+   * Validate file size
+   */
+  validateFileSize(file: File): void {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      const maxSizeMB = MAX_FILE_SIZE_BYTES / (1024 * 1024);
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      throw new Error(`File size (${fileSizeMB}MB) exceeds maximum allowed size (${maxSizeMB}MB)`);
+    }
+  }
+
+  /**
+   * Validate CSV headers
+   */
+  validateCSVHeaders(headers: string[]): void {
+    if (headers.length === 0) {
+      throw new Error('CSV file must have at least one header column');
+    }
+
+    const seenHeaders = new Set<string>();
+    for (const header of headers) {
+      // Check header length
+      if (header.length > MAX_HEADER_LENGTH) {
+        throw new Error(`Header "${header.substring(0, 20)}..." exceeds maximum length of ${MAX_HEADER_LENGTH} characters`);
+      }
+
+      // Check for empty headers
+      if (!header.trim()) {
+        throw new Error('CSV headers cannot be empty');
+      }
+
+      // Check for duplicate headers
+      const normalizedHeader = header.toLowerCase();
+      if (seenHeaders.has(normalizedHeader)) {
+        throw new Error(`Duplicate header found: "${header}"`);
+      }
+      seenHeaders.add(normalizedHeader);
+
+      // Warn about non-standard headers (but don't fail)
+      if (!VALID_HEADER_PATTERN.test(header)) {
+        console.warn(`Header "${header}" contains special characters - may cause issues with some operations`);
+      }
+    }
+  }
+
+  /**
+   * Sanitize a string value to prevent XSS
+   */
+  sanitizeValue(value: string): string {
+    // Check for dangerous patterns
+    for (const pattern of DANGEROUS_PATTERNS) {
+      if (pattern.test(value)) {
+        console.warn(`Potentially dangerous content detected and sanitized: ${value.substring(0, 50)}...`);
+        // Remove potentially dangerous content
+        return value.replace(/<[^>]*>/g, '').replace(/javascript:/gi, '').replace(/on\w+=/gi, '');
+      }
+    }
+    return value;
+  }
+
+  /**
+   * Validate column count consistency in CSV
+   */
+  validateColumnConsistency(lines: string[], headerCount: number): void {
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue; // Skip empty lines
+
+      const values = this.parseCSVLine(lines[i]);
+      if (values.length !== headerCount) {
+        throw new Error(
+          `Row ${i + 1} has ${values.length} columns but header has ${headerCount} columns. ` +
+          `CSV must have consistent column counts.`
+        );
+      }
+    }
+  }
   /**
    * Get all datasets with optional filtering
    */
@@ -65,25 +156,40 @@ class DatasetService {
   }
 
   /**
-   * Parse CSV content to records
+   * Parse CSV content to records with validation and sanitization
    */
   parseCSV(csvContent: string): Record<string, unknown>[] {
     const lines = csvContent.trim().split('\n');
     if (lines.length < 2) {
-      return [];
+      throw new Error('CSV file must have at least a header row and one data row');
     }
 
+    // Parse and validate headers
     const headers = lines[0].split(',').map((h) => h.trim().replace(/^["']|["']$/g, ''));
+    this.validateCSVHeaders(headers);
+
+    // Validate column consistency
+    this.validateColumnConsistency(lines, headers.length);
+
+    // Check record limit
+    if (lines.length - 1 > MAX_RECORDS) {
+      throw new Error(`CSV contains ${lines.length - 1} records but maximum allowed is ${MAX_RECORDS}`);
+    }
+
     const records: Record<string, unknown>[] = [];
 
     for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue; // Skip empty lines
+
       const values = this.parseCSVLine(lines[i]);
       if (values.length === headers.length) {
         const record: Record<string, unknown> = {};
         headers.forEach((header, index) => {
           const value = values[index];
+          // Sanitize string value before parsing
+          const sanitizedValue = typeof value === 'string' ? this.sanitizeValue(value) : value;
           // Try to parse as number or boolean
-          record[header] = this.parseValue(value);
+          record[header] = this.parseValue(sanitizedValue);
         });
         records.push(record);
       }
@@ -177,7 +283,7 @@ class DatasetService {
   }
 
   /**
-   * Upload from file
+   * Upload from file with validation
    */
   async uploadFile(
     file: File,
@@ -189,6 +295,9 @@ class DatasetService {
     },
     options?: RequestOptions
   ): Promise<DatasetResponse> {
+    // Validate file size before processing
+    this.validateFileSize(file);
+
     const format = this.detectFormat(file.name);
     const content = await file.text();
 
@@ -200,6 +309,10 @@ class DatasetService {
         break;
       case 'JSON':
         records = this.parseJSON(content);
+        // Validate record count for JSON as well
+        if (records.length > MAX_RECORDS) {
+          throw new Error(`JSON contains ${records.length} records but maximum allowed is ${MAX_RECORDS}`);
+        }
         break;
       case 'EXCEL':
         // Excel parsing would require a library like xlsx

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AppProvider } from "./contexts/AppContext";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./components/Dashboard";
 import { Scenarios } from "./components/Scenarios";
@@ -67,13 +68,17 @@ export default function App() {
   };
 
   return (
-    <AppProvider>
-      <Layout
-        currentPage={pageState.page}
-        onNavigate={(page) => navigate(page)}
-      >
-        {renderPage()}
-      </Layout>
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <Layout
+          currentPage={pageState.page}
+          onNavigate={(page) => navigate(page)}
+        >
+          <ErrorBoundary>
+            {renderPage()}
+          </ErrorBoundary>
+        </Layout>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

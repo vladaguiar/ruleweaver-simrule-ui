@@ -11,6 +11,7 @@ export interface WebSocketCallbacks {
   onMessage: (message: SimulationWebSocketMessage) => void;
   onStatusChange?: (status: WebSocketStatus) => void;
   onError?: (error: Event) => void;
+  onPermanentFailure?: () => void; // Called when max reconnect attempts reached
 }
 
 class SimulationWebSocket {
@@ -75,6 +76,8 @@ class SimulationWebSocket {
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.warn('Max reconnection attempts reached');
+      // Notify UI of permanent failure so it can offer manual reconnection
+      this.callbacks.onPermanentFailure?.();
       return;
     }
 
@@ -86,6 +89,21 @@ class SimulationWebSocket {
         this.connect();
       }
     }, delay);
+  }
+
+  /**
+   * Reset reconnection attempts to allow manual reconnection after failure
+   */
+  resetReconnectAttempts(): void {
+    this.reconnectAttempts = 0;
+  }
+
+  /**
+   * Manually trigger reconnection (useful after permanent failure)
+   */
+  reconnect(): void {
+    this.resetReconnectAttempts();
+    this.connect();
   }
 
   disconnect(): void {
@@ -161,6 +179,28 @@ class WebSocketService {
   isConnected(simulationId: string): boolean {
     const connection = this.connections.get(simulationId);
     return connection?.isConnected() || false;
+  }
+
+  /**
+   * Manually reconnect to a simulation (useful after permanent failure)
+   */
+  reconnectToSimulation(simulationId: string): boolean {
+    const connection = this.connections.get(simulationId);
+    if (connection) {
+      connection.reconnect();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Reset reconnection attempts for a simulation
+   */
+  resetReconnectAttempts(simulationId: string): void {
+    const connection = this.connections.get(simulationId);
+    if (connection) {
+      connection.resetReconnectAttempts();
+    }
   }
 }
 
