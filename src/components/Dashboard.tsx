@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, Activity, Target, CheckCircle, Plus, RefreshCw, AlertCircle, Wifi, WifiOff, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Activity, Target, CheckCircle, Plus, RefreshCw, AlertCircle, Wifi, WifiOff, ChevronDown, Pause, Play } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useScenarioCounts } from '@/hooks/useScenarios';
 import { useSimulations, useSimulationStats } from '@/hooks/useSimulation';
 import { useActivityStats } from '@/hooks/useStatistics';
+import { useRuleSets } from '@/hooks/useRuleSets';
 import { useAppContext } from '@/contexts/AppContext';
-import { simulationService, scenarioService, coverageService } from '@/services';
-import type { SimulationResponse } from '@/types/api.types';
+import { simulationService, coverageService, statisticsService } from '@/services';
+import { TrendIndicator } from '@/components/ui/TrendIndicator';
+import type { SimulationResponse, TrendsResponse, OverviewResponse, TrendDirection } from '@/types/api.types';
 
 interface DashboardProps {
   onNavigate: (page: string, params?: { scenarioId?: string; simulationId?: string }) => void;
@@ -41,7 +43,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const { counts: scenarioCounts, loading: scenariosLoading } = useScenarioCounts();
   const { stats: simStats, loading: statsLoading } = useSimulationStats();
   const { activityData, loading: activityLoading } = useActivityStats();
-  const { apiStatus, checkApiConnection } = useAppContext();
+  const { apiStatus, checkApiConnection, settings } = useAppContext();
 
   // Recent simulations state
   const [recentSimulations, setRecentSimulations] = useState<SimulationResponse[]>([]);
@@ -49,9 +51,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [refreshing, setRefreshing] = useState(false);
 
   // Rule set and coverage state
-  const [availableRuleSets, setAvailableRuleSets] = useState<string[]>([]);
+  const { ruleSetIds: availableRuleSets, loading: ruleSetsLoading } = useRuleSets();
   const [selectedRuleSet, setSelectedRuleSet] = useState<string | null>(null);
-  const [ruleSetsLoading, setRuleSetsLoading] = useState(true);
   const [coverageMetrics, setCoverageMetrics] = useState<{
     percentage: number;
     covered: number;
@@ -60,36 +61,26 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   } | null>(null);
   const [coverageLoading, setCoverageLoading] = useState(true);
 
-  // Load available rule sets on mount
+  // Auto-refresh state
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [timeUntilRefresh, setTimeUntilRefresh] = useState(settings.autoRefreshInterval / 1000);
+  const autoRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // KPI trends state
+  const [trends, setTrends] = useState<TrendsResponse | null>(null);
+  const [trendsLoading, setTrendsLoading] = useState(true);
+
+  // Overview statistics state (single API call for all overview stats)
+  const [overview, setOverview] = useState<OverviewResponse | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+
+  // Set default selected rule set when rule sets are loaded
   useEffect(() => {
-    const abortController = new AbortController();
-
-    const loadRuleSets = async () => {
-      try {
-        const ruleSets = await scenarioService.getRuleSets({ signal: abortController.signal });
-        if (!abortController.signal.aborted) {
-          setAvailableRuleSets(ruleSets);
-          if (ruleSets.length > 0) {
-            setSelectedRuleSet(ruleSets[0]); // Default to first
-          }
-        }
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          return;
-        }
-        console.error('Failed to load rule sets:', error);
-      } finally {
-        if (!abortController.signal.aborted) {
-          setRuleSetsLoading(false);
-        }
-      }
-    };
-    loadRuleSets();
-
-    return () => {
-      abortController.abort();
-    };
-  }, []);
+    if (availableRuleSets.length > 0 && !selectedRuleSet) {
+      setSelectedRuleSet(availableRuleSets[0]);
+    }
+  }, [availableRuleSets, selectedRuleSet]);
 
   // Fetch coverage when selected rule set changes
   useEffect(() => {
@@ -164,32 +155,158 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     };
   }, []);
 
+  // Load KPI trends on mount
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    const loadTrends = async () => {
+      try {
+        const trendsData = await statisticsService.getTrends('weekly', { signal: abortController.signal });
+        if (!abortController.signal.aborted) {
+          setTrends(trendsData);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        console.error('Failed to load trends:', error);
+      } finally {
+        if (!abortController.signal.aborted) {
+          setTrendsLoading(false);
+        }
+      }
+    };
+    loadTrends();
+
+    return () => {
+      abortController.abort();
+    };
+  }, []);
+
+  // Load overview statistics on mount
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    const loadOverview = async () => {
+      try {
+        const overviewData = await statisticsService.getOverview({ signal: abortController.signal });
+        if (!abortController.signal.aborted) {
+          setOverview(overviewData);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        console.error('Failed to load overview:', error);
+      } finally {
+        if (!abortController.signal.aborted) {
+          setOverviewLoading(false);
+        }
+      }
+    };
+    loadOverview();
+
+    return () => {
+      abortController.abort();
+    };
+  }, []);
+
   // Refresh function
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await checkApiConnection();
     try {
-      const recent = await simulationService.getRecent(5);
+      const [recent, trendsData, overviewData] = await Promise.all([
+        simulationService.getRecent(5),
+        statisticsService.getTrends('weekly'),
+        statisticsService.getOverview(),
+      ]);
       setRecentSimulations(recent);
+      if (trendsData) {
+        setTrends(trendsData);
+      }
+      if (overviewData) {
+        setOverview(overviewData);
+      }
     } catch (error) {
       console.error('Failed to refresh:', error);
     }
     setRefreshing(false);
+    // Reset countdown after refresh
+    setTimeUntilRefresh(settings.autoRefreshInterval / 1000);
+  }, [checkApiConnection, settings.autoRefreshInterval]);
+
+  // Toggle auto-refresh
+  const toggleAutoRefresh = useCallback(() => {
+    setAutoRefreshEnabled(prev => !prev);
+  }, []);
+
+  // Auto-refresh effect
+  useEffect(() => {
+    // Clear existing timers
+    if (autoRefreshTimerRef.current) {
+      clearTimeout(autoRefreshTimerRef.current);
+    }
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+    }
+
+    if (!autoRefreshEnabled || settings.autoRefreshInterval <= 0) {
+      return;
+    }
+
+    // Set up auto-refresh timer
+    autoRefreshTimerRef.current = setTimeout(() => {
+      handleRefresh();
+    }, settings.autoRefreshInterval);
+
+    // Set up countdown timer (updates every second)
+    setTimeUntilRefresh(settings.autoRefreshInterval / 1000);
+    countdownTimerRef.current = setInterval(() => {
+      setTimeUntilRefresh(prev => Math.max(0, prev - 1));
+    }, 1000);
+
+    // Cleanup
+    return () => {
+      if (autoRefreshTimerRef.current) {
+        clearTimeout(autoRefreshTimerRef.current);
+      }
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+      }
+    };
+  }, [autoRefreshEnabled, settings.autoRefreshInterval, handleRefresh]);
+
+  // Helper to get trend data from API response
+  const getTrendInfo = (): { change: number; direction: TrendDirection } | null => {
+    if (trendsLoading || !trends?.summary) return null;
+    return {
+      change: trends.summary.percentageChange,
+      direction: trends.summary.trend,
+    };
   };
 
-  // Build KPI data from actual state
+  const trendInfo = getTrendInfo();
+
+  // Build KPI data from actual state - prefer overview API when available
+  const isLoading = overviewLoading && scenariosLoading;
+  const totalScenarios = overview?.totalScenarios ?? scenarioCounts.all;
+  const runningSimulations = overview?.runningSimulations ?? simStats.running;
+  const completedSimulations = overview?.totalSimulations ?? simStats.completed;
+  const successRate = overview?.overallSuccessRate ?? simStats.avgPassRate;
+
   const kpiData = [
     {
       label: 'Total Scenarios',
-      value: scenariosLoading ? '...' : String(scenarioCounts.all),
-      trend: '+12%',
+      value: isLoading ? '...' : String(totalScenarios),
+      trendInfo: trendInfo, // Show overall trend on scenarios
       icon: Activity,
       color: 'var(--color-primary)',
     },
     {
       label: 'Active Sims',
-      value: statsLoading ? '...' : String(simStats.running),
-      status: simStats.running > 0 ? 'Live' : 'None',
+      value: overviewLoading && statsLoading ? '...' : String(runningSimulations),
+      status: runningSimulations > 0 ? 'Live' : 'None',
       icon: Activity,
       color: 'var(--color-accent)',
     },
@@ -201,8 +318,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     },
     {
       label: 'Recent Runs',
-      value: statsLoading ? '...' : String(simStats.completed),
-      status: `${Math.round(simStats.avgPassRate)}% Pass`,
+      value: overviewLoading && statsLoading ? '...' : String(completedSimulations),
+      status: `${Math.round(successRate)}% Pass`,
+      trendInfo: trendInfo, // Show overall trend on recent runs too
       icon: CheckCircle,
       color: 'var(--color-info)',
     },
@@ -258,6 +376,27 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Auto-refresh indicator and toggle */}
+          <div className="flex items-center gap-2 mr-2">
+            <button
+              onClick={toggleAutoRefresh}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors"
+              style={{
+                backgroundColor: autoRefreshEnabled ? 'var(--color-success)' : 'var(--color-surface)',
+                color: autoRefreshEnabled ? 'white' : 'var(--color-text-secondary)',
+                fontSize: '12px',
+                border: '1px solid var(--color-border)',
+              }}
+              title={autoRefreshEnabled ? 'Click to pause auto-refresh' : 'Click to enable auto-refresh'}
+            >
+              {autoRefreshEnabled ? <Pause size={14} /> : <Play size={14} />}
+              {autoRefreshEnabled ? (
+                <span>Auto ({timeUntilRefresh}s)</span>
+              ) : (
+                <span>Paused</span>
+              )}
+            </button>
+          </div>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
@@ -292,11 +431,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <div className="p-3 rounded-lg" style={{ backgroundColor: `${kpi.color}15` }}>
                   <Icon size={24} style={{ color: kpi.color }} />
                 </div>
-                {kpi.trend && (
-                  <span className="flex items-center gap-1 text-[var(--color-success)]" style={{ fontSize: '12px', fontWeight: 500 }}>
-                    <TrendingUp size={14} />
-                    {kpi.trend}
-                  </span>
+                {kpi.trendInfo && (
+                  <TrendIndicator
+                    change={kpi.trendInfo.change}
+                    trend={kpi.trendInfo.direction}
+                  />
                 )}
               </div>
               <div style={{ fontSize: '32px', fontWeight: 700, color: 'var(--color-primary)', lineHeight: 1 }}>

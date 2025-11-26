@@ -70,10 +70,12 @@ export const API_ENDPOINTS = {
   SCENARIOS: '/scenarios',
   SCENARIO_BY_ID: (id: string) => `/scenarios/${id}`,
   SCENARIO_CLONE: (id: string) => `/scenarios/${id}/clone`,
+  SCENARIOS_BULK_DELETE: '/scenarios/bulk',
 
   // Simulations
   SIMULATIONS: '/simulations',
   SIMULATION_BY_ID: (id: string) => `/simulations/${id}`,
+  SIMULATION_CANCEL: (id: string) => `/simulations/${id}/cancel`,
 
   // Datasets
   DATASETS: '/datasets',
@@ -85,6 +87,16 @@ export const API_ENDPOINTS = {
 
   // Statistics
   STATISTICS_ACTIVITY: '/statistics/activity',
+  STATISTICS_OVERVIEW: '/statistics/overview',
+  STATISTICS_TRENDS: '/statistics/trends',
+
+  // Schemas
+  SCHEMAS: '/schemas',
+  SCHEMA_BY_FACT_TYPE: (factType: string) => `/schemas/${encodeURIComponent(factType)}`,
+  SCHEMA_SAMPLE: (factType: string) => `/schemas/${encodeURIComponent(factType)}/sample`,
+
+  // Rule Sets
+  RULE_SETS: '/rules/sets',
 
   // Health - actuator is under /api not /api/v1
   HEALTH: '/actuator/health',

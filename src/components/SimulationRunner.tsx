@@ -3,6 +3,7 @@ import { Play, Pause, Square, CheckCircle, XCircle, AlertTriangle, RefreshCw, Se
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { useScenarios } from '@/hooks/useScenarios';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useRuleSets } from '@/hooks/useRuleSets';
 import { simulationService, scenarioService } from '@/services';
 import { websocketService, type WebSocketStatus, type SimulationWebSocket } from '@/services/websocket.service';
 import { useAppContext } from '@/contexts/AppContext';
@@ -34,6 +35,7 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
   const [simulation, setSimulation] = useState<SimulationResponse | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [progress, setProgress] = useState(0);
   const [totalScenarios, setTotalScenarios] = useState(0);
   const [completedScenarios, setCompletedScenarios] = useState(0);
@@ -59,7 +61,7 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
   const [scenarioSearch, setScenarioSearch] = useState('');
   const debouncedSearch = useDebounce(scenarioSearch, 300); // Debounce search input
   const [ruleSetFilter, setRuleSetFilter] = useState<string>('all');
-  const [availableRuleSets, setAvailableRuleSets] = useState<string[]>([]);
+  const { ruleSetIds: availableRuleSets } = useRuleSets();
 
   // Timer ref
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -75,9 +77,6 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
         // API returns array directly, not paginated response
         const scenarios = await scenarioService.getAll({ status: 'ACTIVE' });
         setAvailableScenarios(scenarios || []);
-
-        const ruleSets = await scenarioService.getRuleSets();
-        setAvailableRuleSets(ruleSets || []);
       } catch (e) {
         addNotification({
           type: 'error',
@@ -292,24 +291,87 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
 
   // Stop simulation
   const handleStop = async () => {
-    if (simulationIdRef.current) {
+    if (!simulationIdRef.current) return;
+
+    // Confirm cancellation
+    const confirmed = window.confirm(
+      'Are you sure you want to cancel this simulation? Progress will be lost for remaining scenarios.'
+    );
+
+    if (!confirmed) return;
+
+    setIsCancelling(true);
+
+    try {
+      const result = await simulationService.cancel(simulationIdRef.current);
+
+      // Disconnect WebSocket
       websocketService.disconnectFromSimulation(simulationIdRef.current);
       simulationIdRef.current = null;
+      wsConnectionRef.current = null;
+
+      // Stop timer and update state
+      stopTimer();
+      setIsRunning(false);
+      setIsPaused(false);
+
+      setLogs(prev => [...prev, {
+        type: 'warning',
+        time: new Date().toLocaleTimeString('en-US', { hour12: false }),
+        message: `Simulation cancelled: ${result.message || 'Cancelled by user'}`,
+      }]);
+
+      addNotification({
+        type: 'warning',
+        title: 'Simulation Cancelled',
+        message: result.message || `Simulation was cancelled`,
+      });
+
+    } catch (error: unknown) {
+      console.error('Failed to cancel simulation:', error);
+
+      // Try to extract status code from error
+      const apiError = error as { status?: number; message?: string };
+
+      if (apiError.status === 409) {
+        // Simulation already completed or in non-cancellable state
+        addNotification({
+          type: 'info',
+          title: 'Cannot Cancel',
+          message: 'Simulation has already completed or is in a non-cancellable state',
+        });
+      } else if (apiError.status === 404) {
+        addNotification({
+          type: 'error',
+          title: 'Cancel Failed',
+          message: 'Simulation not found',
+        });
+      } else {
+        addNotification({
+          type: 'error',
+          title: 'Cancel Failed',
+          message: 'Unable to cancel simulation. It may have already completed.',
+        });
+      }
+
+      // Still disconnect WebSocket as fallback
+      if (simulationIdRef.current) {
+        websocketService.disconnectFromSimulation(simulationIdRef.current);
+        simulationIdRef.current = null;
+      }
+      wsConnectionRef.current = null;
+      stopTimer();
+      setIsRunning(false);
+      setIsPaused(false);
+
+      setLogs(prev => [...prev, {
+        type: 'error',
+        time: new Date().toLocaleTimeString('en-US', { hour12: false }),
+        message: 'Failed to cancel simulation - disconnected from progress feed',
+      }]);
+    } finally {
+      setIsCancelling(false);
     }
-    wsConnectionRef.current = null;
-    stopTimer();
-    setIsRunning(false);
-    setIsPaused(false);
-    setLogs(prev => [...prev, {
-      type: 'warning',
-      time: new Date().toLocaleTimeString('en-US', { hour12: false }),
-      message: 'Simulation stopped by user',
-    }]);
-    addNotification({
-      type: 'warning',
-      title: 'Simulation Stopped',
-      message: 'The simulation was stopped',
-    });
   };
 
   // Export log
@@ -367,11 +429,21 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
             <>
               <button
                 onClick={handleStop}
-                className="flex items-center gap-2 px-4 py-2 border rounded hover:bg-[var(--color-surface)] transition-colors"
+                disabled={isCancelling}
+                className="flex items-center gap-2 px-4 py-2 border rounded hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ borderColor: 'var(--color-error)', fontSize: '14px', fontWeight: 500, color: 'var(--color-error)' }}
               >
-                <Square size={18} />
-                Stop
+                {isCancelling ? (
+                  <>
+                    <RefreshCw size={18} className="animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  <>
+                    <Square size={18} />
+                    Stop
+                  </>
+                )}
               </button>
             </>
           )}

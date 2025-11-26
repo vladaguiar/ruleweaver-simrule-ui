@@ -366,10 +366,177 @@ export interface AppSettings {
   defaultRuleSet?: string;
   defaultPageSize: number;
   autoRefreshInterval: number;
+  autoSaveInterval: number;
   theme: 'light' | 'dark' | 'auto';
   defaultExecutionMode: ExecutionMode;
   scenarioTimeoutSeconds: number;
   maxConcurrentScenarios: number;
   editorTheme: 'vs-light' | 'vs-dark' | 'hc-black';
   tableDensity: 'compact' | 'standard' | 'comfortable';
+}
+
+// ============================================
+// Simulation Cancellation Types
+// ============================================
+
+export interface CancellationResponse {
+  id: string;
+  name?: string;
+  status: SimulationStatus;
+  completedAt?: string;
+  message?: string;
+}
+
+// ============================================
+// Dataset Update Types
+// ============================================
+
+export interface UpdateDatasetRequest {
+  name?: string;
+  description?: string;
+  records?: Record<string, unknown>[];
+  tags?: string[];
+  status?: DatasetStatus;
+}
+
+// ============================================
+// Statistics Types
+// ============================================
+
+export type TrendDirection = 'UP' | 'DOWN' | 'STABLE';
+
+export interface TrendDataPoint {
+  date: string;
+  simulations: number;
+  scenarios: number;
+  successRate: number;
+  avgExecutionTime: number;
+}
+
+export interface TrendSummary {
+  totalSimulations: number;
+  totalScenarios: number;
+  avgSuccessRate: number;
+  trend: TrendDirection;
+  percentageChange: number;
+}
+
+export interface TrendsResponse {
+  period: string;
+  dataPoints: TrendDataPoint[];
+  summary: TrendSummary;
+}
+
+export interface OverviewResponse {
+  totalScenarios: number;
+  activeScenarios: number;
+  totalSimulations: number;
+  simulationsToday: number;
+  runningSimulations: number;
+  overallSuccessRate: number;
+  todaySuccessRate: number;
+  totalDatasets: number;
+  activeDatasets: number;
+  statusBreakdown: Record<SimulationStatus, number>;
+  lastSimulationAt?: string;
+  avgExecutionTimeMs: number;
+  totalScenariosExecuted: number;
+  totalScenariosPassed: number;
+}
+
+export interface DailyActivity {
+  date: string;
+  tests: number;
+  passed: number;
+}
+
+// ============================================
+// Bulk Delete Types
+// ============================================
+
+export interface BulkDeleteRequest {
+  scenarioIds: string[];
+}
+
+export interface BulkDeleteFailure {
+  scenarioId: string;
+  reason: string;
+}
+
+export interface BulkDeleteResponse {
+  totalRequested: number;
+  successCount: number;
+  failureCount: number;
+  deletedIds: string[];
+  failures: BulkDeleteFailure[];
+}
+
+// ============================================
+// Schema Types
+// ============================================
+
+export interface FieldConstraints {
+  pattern?: string;
+  allowedValues?: string[];
+  min?: number;
+  max?: number;
+}
+
+export interface FieldDefinition {
+  name: string;
+  type: string;
+  description?: string;
+  required: boolean;
+  exampleValue?: unknown;
+  constraints?: FieldConstraints;
+}
+
+export interface SchemaMetadata {
+  source: string;
+  retrievedAt: string;
+  version?: string;
+}
+
+export interface FactTypeSchema {
+  factType: string;
+  displayName?: string;
+  description?: string;
+  packageName?: string;
+  fields: FieldDefinition[];
+  associatedRuleSets?: string[];
+  fieldCount: number;
+  requiredFieldCount: number;
+  metadata?: SchemaMetadata;
+}
+
+export interface SampleDataResponse {
+  factType: string;
+  sampleData: Record<string, unknown>;
+  variations?: Record<string, unknown>[];
+  count: number;
+  seed?: number;
+  generatedAt: string;
+  notes?: string;
+}
+
+// ============================================
+// Rule Set Types
+// ============================================
+
+export interface RuleSetInfo {
+  ruleSetId: string;
+  ruleCount: number;
+  lastUpdated: string;
+  version: number;
+  active: boolean;
+  description: string | null;
+  environment: string | null;
+}
+
+export interface RuleSetsResponse {
+  ruleSets: RuleSetInfo[];
+  totalCount: number;
+  page: number;
+  size: number;
+  hasMore: boolean;
 }

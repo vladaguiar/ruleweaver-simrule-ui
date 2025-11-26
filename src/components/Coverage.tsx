@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { FileText, Mail, Download, AlertCircle, RefreshCw, Plus } from 'lucide-react';
-import { coverageService, scenarioService } from '@/services';
+import { coverageService } from '@/services';
+import { useRuleSets } from '@/hooks/useRuleSets';
 import { useAppContext } from '@/contexts/AppContext';
 import type { CoverageReportResponse, RuleCoverageDto } from '@/types/api.types';
 
@@ -16,25 +17,16 @@ export function Coverage({ onNavigate }: CoverageProps) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [coverageReport, setCoverageReport] = useState<CoverageReportResponse | null>(null);
-  const [availableRuleSets, setAvailableRuleSets] = useState<string[]>([]);
+  const { ruleSetIds: availableRuleSets } = useRuleSets();
   const [selectedRuleSet, setSelectedRuleSet] = useState<string>('');
   const [trendData, setTrendData] = useState<Array<{ date: string; coverage: number }>>([]);
 
-  // Load available rule sets
+  // Set default selected rule set when rule sets are loaded
   useEffect(() => {
-    const loadRuleSets = async () => {
-      try {
-        const ruleSets = await scenarioService.getRuleSets();
-        setAvailableRuleSets(ruleSets);
-        if (ruleSets.length > 0 && !selectedRuleSet) {
-          setSelectedRuleSet(ruleSets[0]);
-        }
-      } catch (e) {
-        console.error('Failed to load rule sets:', e);
-      }
-    };
-    loadRuleSets();
-  }, []);
+    if (availableRuleSets.length > 0 && !selectedRuleSet) {
+      setSelectedRuleSet(availableRuleSets[0]);
+    }
+  }, [availableRuleSets, selectedRuleSet]);
 
   // Load coverage report
   const loadCoverage = useCallback(async () => {

@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Filter, Play, Copy, Trash2, Check, RefreshCw, AlertCircle, Edit2, Archive, MoreVertical, X } from 'lucide-react';
+import { Search, Plus, Filter, Play, Copy, Trash2, Check, RefreshCw, AlertCircle, Edit2, Archive, MoreVertical, X, Download } from 'lucide-react';
 import { useScenarios } from '@/hooks/useScenarios';
+import { useRuleSets } from '@/hooks/useRuleSets';
 import { scenarioService, simulationService } from '@/services';
 import { useAppContext } from '@/contexts/AppContext';
+import { Pagination } from '@/components/ui/Pagination';
+import { exportToCSV, formatArrayForExport, formatDateForExport } from '@/utils/export';
 import type { ScenarioResponse, ScenarioStatus, PaginatedResponse } from '@/types/api.types';
 
 interface ScenariosProps {
@@ -33,11 +36,11 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
+  // Pagination state (0-based page index)
+  const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const pageSize = settings.defaultPageSize || 10;
+  const [pageSize, setPageSize] = useState(settings.defaultPageSize || 10);
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,7 +50,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Available filter options (loaded from API)
-  const [availableRuleSets, setAvailableRuleSets] = useState<string[]>([]);
+  const { ruleSetIds: availableRuleSets } = useRuleSets();
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   // UI state
@@ -56,7 +59,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
 
-  // Load scenarios
+  // Load scenarios - uses server-side pagination with client-side fallback
   const loadScenarios = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -65,17 +68,15 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
       if (statusFilter !== 'all') filters.status = statusFilter;
       if (ruleSetFilter !== 'all') filters.ruleSet = ruleSetFilter;
 
-      // API returns array, not paginated response - handle pagination client-side
-      const allScenarios = await scenarioService.getAll(filters as any);
+      // Try server-side pagination first (with fallback in the service)
+      const result = await scenarioService.getPaginated(
+        { page: currentPage, size: pageSize },
+        filters as any
+      );
 
-      // Client-side pagination
-      const startIndex = (currentPage - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      const paginatedScenarios = allScenarios.slice(startIndex, endIndex);
-
-      setScenarios(paginatedScenarios);
-      setTotalPages(Math.ceil(allScenarios.length / pageSize) || 1);
-      setTotalItems(allScenarios.length);
+      setScenarios(result.content);
+      setTotalPages(result.totalPages || 1);
+      setTotalItems(result.totalElements);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load scenarios');
       setScenarios([]);
@@ -84,21 +85,17 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
     }
   }, [currentPage, pageSize, statusFilter, ruleSetFilter, selectedTags]);
 
-  // Load filter options
+  // Load tags filter options
   useEffect(() => {
-    const loadFilterOptions = async () => {
+    const loadTags = async () => {
       try {
-        const [ruleSets, tags] = await Promise.all([
-          scenarioService.getRuleSets(),
-          scenarioService.getTags(),
-        ]);
-        setAvailableRuleSets(ruleSets);
+        const tags = await scenarioService.getTags();
         setAvailableTags(tags);
       } catch (e) {
-        console.error('Failed to load filter options:', e);
+        console.error('Failed to load tags:', e);
       }
     };
-    loadFilterOptions();
+    loadTags();
   }, []);
 
   // Load scenarios on mount and when filters change
@@ -106,11 +103,30 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
     loadScenarios();
   }, [loadScenarios]);
 
-  // Filter scenarios by search term (client-side for instant feedback)
-  const filteredScenarios = scenarios.filter(scenario =>
-    scenario.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    scenario.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter scenarios by search term and tags (client-side for instant feedback)
+  const filteredScenarios = scenarios.filter(scenario => {
+    // Search term filter
+    const matchesSearch = searchTerm === '' ||
+      scenario.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      scenario.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Tag filter - scenario must have ALL selected tags
+    const matchesTags = selectedTags.length === 0 ||
+      selectedTags.every(tag => scenario.tags?.includes(tag));
+
+    return matchesSearch && matchesTags;
+  });
+
+  // Calculate tag counts for badges
+  const tagCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    scenarios.forEach(scenario => {
+      scenario.tags?.forEach(tag => {
+        counts[tag] = (counts[tag] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [scenarios]);
 
   // Selection handlers
   const toggleScenario = (id: string) => {
@@ -200,14 +216,39 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
 
   const handleBulkDelete = async () => {
     if (selectedScenarios.length === 0) return;
+
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${selectedScenarios.length} scenario(s)? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
     setProcessing('bulk');
     try {
-      await scenarioService.bulkDelete(selectedScenarios);
-      addNotification({
-        type: 'success',
-        title: 'Scenarios Deleted',
-        message: `Deleted ${selectedScenarios.length} scenarios`,
-      });
+      const result = await scenarioService.bulkDelete(selectedScenarios);
+
+      // Show appropriate notification based on results
+      if (result.failureCount === 0) {
+        addNotification({
+          type: 'success',
+          title: 'Scenarios Deleted',
+          message: `Successfully deleted ${result.successCount} scenario(s)`,
+        });
+      } else if (result.successCount > 0) {
+        addNotification({
+          type: 'warning',
+          title: 'Partial Success',
+          message: `Deleted ${result.successCount} scenario(s), but ${result.failureCount} failed`,
+        });
+      } else {
+        addNotification({
+          type: 'error',
+          title: 'Delete Failed',
+          message: `Failed to delete ${result.failureCount} scenario(s)`,
+        });
+      }
+
+      // Clear selection and reload regardless of partial success
       setSelectedScenarios([]);
       loadScenarios();
     } catch (e) {
@@ -304,64 +345,71 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
     setSearchTerm('');
   };
 
-  // Pagination
-  const goToPage = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
+  // Pagination handlers
+  const handlePageChange = useCallback((page: number) => {
+    if (page >= 0 && page < totalPages) {
       setCurrentPage(page);
     }
-  };
+  }, [totalPages]);
 
-  const renderPaginationButtons = () => {
-    const pages = [];
-    const maxVisible = 5;
-    let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-    let end = Math.min(totalPages, start + maxVisible - 1);
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setCurrentPage(0); // Reset to first page when changing page size
+  }, []);
 
-    if (end - start < maxVisible - 1) {
-      start = Math.max(1, end - maxVisible + 1);
+  // Export scenarios to CSV
+  const handleExportCSV = useCallback(async () => {
+    try {
+      // Get all scenarios for export (not just paginated)
+      const filters: Record<string, string | undefined> = {};
+      if (statusFilter !== 'all') filters.status = statusFilter;
+      if (ruleSetFilter !== 'all') filters.ruleSet = ruleSetFilter;
+
+      const allScenarios = await scenarioService.getAll(filters as any);
+
+      // Apply tag filter if set
+      const filteredForExport = selectedTags.length > 0
+        ? allScenarios.filter(s => selectedTags.every(tag => s.tags?.includes(tag)))
+        : allScenarios;
+
+      // Define columns for export
+      const columns: { key: keyof ScenarioResponse; header: string }[] = [
+        { key: 'id', header: 'ID' },
+        { key: 'name', header: 'Name' },
+        { key: 'description', header: 'Description' },
+        { key: 'status', header: 'Status' },
+        { key: 'ruleSet', header: 'Rule Set' },
+        { key: 'factType', header: 'Fact Type' },
+        { key: 'agendaGroup', header: 'Agenda Group' },
+        { key: 'tags', header: 'Tags' },
+        { key: 'createdAt', header: 'Created At' },
+        { key: 'updatedAt', header: 'Updated At' },
+      ];
+
+      // Transform data for export
+      const exportData = filteredForExport.map(scenario => ({
+        ...scenario,
+        tags: formatArrayForExport(scenario.tags),
+        createdAt: formatDateForExport(scenario.createdAt),
+        updatedAt: formatDateForExport(scenario.updatedAt),
+      }));
+
+      const filename = `scenarios-${new Date().toISOString().slice(0, 10)}.csv`;
+      exportToCSV(exportData as unknown as Record<string, unknown>[], columns as any, filename);
+
+      addNotification({
+        type: 'success',
+        title: 'Export Complete',
+        message: `Exported ${filteredForExport.length} scenarios to CSV`,
+      });
+    } catch (e) {
+      addNotification({
+        type: 'error',
+        title: 'Export Failed',
+        message: e instanceof Error ? e.message : 'Failed to export scenarios',
+      });
     }
-
-    if (start > 1) {
-      pages.push(
-        <button key={1} onClick={() => goToPage(1)} className="px-3 py-1 rounded transition-colors" style={{ fontSize: '14px', color: 'var(--color-primary)' }}>
-          1
-        </button>
-      );
-      if (start > 2) {
-        pages.push(<span key="start-ellipsis" className="px-2" style={{ color: 'var(--color-text-muted)' }}>...</span>);
-      }
-    }
-
-    for (let i = start; i <= end; i++) {
-      pages.push(
-        <button
-          key={i}
-          onClick={() => goToPage(i)}
-          className="px-3 py-1 rounded transition-colors"
-          style={{
-            fontSize: '14px',
-            backgroundColor: i === currentPage ? 'var(--color-primary)' : 'transparent',
-            color: i === currentPage ? '#FFFFFF' : 'var(--color-primary)',
-          }}
-        >
-          {i}
-        </button>
-      );
-    }
-
-    if (end < totalPages) {
-      if (end < totalPages - 1) {
-        pages.push(<span key="end-ellipsis" className="px-2" style={{ color: 'var(--color-text-muted)' }}>...</span>);
-      }
-      pages.push(
-        <button key={totalPages} onClick={() => goToPage(totalPages)} className="px-3 py-1 rounded transition-colors" style={{ fontSize: '14px', color: 'var(--color-primary)' }}>
-          {totalPages}
-        </button>
-      );
-    }
-
-    return pages;
-  };
+  }, [statusFilter, ruleSetFilter, selectedTags, addNotification]);
 
   const CustomCheckbox = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
     <div
@@ -389,6 +437,16 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={loading || totalItems === 0}
+            className="flex items-center gap-2 px-4 py-2 border rounded hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
+            style={{ borderColor: 'var(--color-border)', fontSize: '14px' }}
+            title="Export scenarios to CSV"
+          >
+            <Download size={18} />
+            Export
+          </button>
           <button
             onClick={loadScenarios}
             disabled={loading}
@@ -510,11 +568,32 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
                   }}
                 >
                   {tag}
+                  <span
+                    className="ml-1 px-1.5 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: selectedTags.includes(tag) ? 'rgba(255,255,255,0.2)' : 'var(--color-surface)',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      minWidth: '18px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {tagCounts[tag] || 0}
+                  </span>
                   {selectedTags.includes(tag) && <X size={12} />}
                 </button>
               ))
             ) : (
               <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>No tags available</span>
+            )}
+            {selectedTags.length > 0 && (
+              <button
+                onClick={() => setSelectedTags([])}
+                className="ml-2 text-xs hover:underline"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                Clear tags
+              </button>
             )}
           </div>
         </div>
@@ -555,7 +634,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
                   <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Name</th>
                   <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Status</th>
                   <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>RuleSet</th>
-                  <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Fact Type</th>
+                  <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Tags</th>
                   <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Updated</th>
                   <th className="text-left p-4" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>Actions</th>
                 </tr>
@@ -611,7 +690,42 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
                       </span>
                     </td>
                     <td className="p-4" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{scenario.ruleSet}</td>
-                    <td className="p-4" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{scenario.factType}</td>
+                    <td className="p-4">
+                      <div className="flex flex-wrap gap-1">
+                        {scenario.tags && scenario.tags.length > 0 ? (
+                          scenario.tags.slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              onClick={() => toggleTagFilter(tag)}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                              style={{
+                                backgroundColor: selectedTags.includes(tag) ? 'var(--color-primary)' : 'var(--color-surface)',
+                                color: selectedTags.includes(tag) ? '#FFFFFF' : 'var(--color-text-secondary)',
+                                fontSize: '11px',
+                                border: '1px solid var(--color-border)'
+                              }}
+                            >
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>—</span>
+                        )}
+                        {scenario.tags && scenario.tags.length > 3 && (
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: 'var(--color-surface)',
+                              color: 'var(--color-text-muted)',
+                              fontSize: '11px',
+                              border: '1px solid var(--color-border)'
+                            }}
+                          >
+                            +{scenario.tags.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-4" style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
                       {formatRelativeTime(scenario.updatedAt)}
                     </td>
@@ -694,30 +808,20 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex justify-between items-center gap-2 p-4 border-t" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
-            <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-              Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalItems)} of {totalItems}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1 rounded hover:bg-[var(--color-background)] transition-colors disabled:opacity-50"
-                style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}
-              >
-                Previous
-              </button>
-              {renderPaginationButtons()}
-              <button
-                onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 rounded hover:bg-[var(--color-background)] transition-colors disabled:opacity-50"
-                style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}
-              >
-                Next
-              </button>
-            </div>
+        {totalItems > 0 && (
+          <div className="p-4 border-t" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalElements={totalItems}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              pageSizeOptions={[5, 10, 20, 50, 100]}
+              showPageSizeSelector={true}
+              showPageInfo={true}
+              showFirstLast={true}
+            />
           </div>
         )}
       </div>

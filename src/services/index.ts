@@ -13,3 +13,5 @@ export {
   type WebSocketCallbacks,
 } from './websocket.service';
 export { statisticsService, StatisticsService, type DailyActivity } from './statistics.service';
+export { schemaService, SchemaService, type ValidationError } from './schema.service';
+export { ruleSetService, RuleSetService } from './ruleset.service';
