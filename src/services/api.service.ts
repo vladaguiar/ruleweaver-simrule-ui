@@ -1,7 +1,7 @@
 // Base API Service for SimRule UI
 // Provides core HTTP functionality with error handling, retries, and correlation tracking
 
-import { apiConfig, getDefaultHeaders } from '@/config/api.config';
+import { apiConfig, getDefaultHeaders, getActuatorBaseUrl } from '@/config/api.config';
 
 export interface ApiError {
   status: number;
@@ -171,7 +171,8 @@ class ApiService {
   // Health check
   async checkHealth(): Promise<{ status: string }> {
     try {
-      const response = await fetch(`${this.baseUrl.replace('/api/v1', '')}/actuator/health`, {
+      const actuatorUrl = getActuatorBaseUrl();
+      const response = await fetch(`${actuatorUrl}/actuator/health`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
         signal: this.createTimeoutSignal(5000),

@@ -84,10 +84,15 @@ export const API_ENDPOINTS = {
   COVERAGE: (ruleSet: string) => `/coverage/${ruleSet}`,
   COVERAGE_LATEST: (ruleSet: string) => `/coverage/${ruleSet}/latest`,
 
-  // Health
+  // Health - actuator is under /api not /api/v1
   HEALTH: '/actuator/health',
   METRICS: '/actuator/metrics',
 } as const;
+
+// Actuator base URL (without /v1)
+export const getActuatorBaseUrl = (): string => {
+  return apiConfig.baseUrl.replace('/api/v1', '/api');
+};
 
 // WebSocket Endpoints
 export const WS_ENDPOINTS = {

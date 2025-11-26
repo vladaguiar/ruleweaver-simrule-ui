@@ -64,8 +64,9 @@ export function Settings() {
     setApiError(null);
 
     try {
-      // Test health endpoint
-      const response = await fetch(`${formData.apiBaseUrl.replace('/api/v1', '')}/actuator/health`, {
+      // Test health endpoint - actuator is at /api/actuator/health
+      const actuatorUrl = formData.apiBaseUrl.replace('/api/v1', '/api');
+      const response = await fetch(`${actuatorUrl}/actuator/health`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
         signal: AbortSignal.timeout(5000),
