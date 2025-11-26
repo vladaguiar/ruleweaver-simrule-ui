@@ -241,7 +241,10 @@ export function AppProvider({ children }: AppProviderProps) {
 export function useAppContext(): AppContextState {
   const context = useContext(AppContext);
   if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider');
+    throw new Error(
+      'useAppContext must be used within an AppProvider. ' +
+      'Wrap your component tree with <AppProvider> in your app root.'
+    );
   }
   return context;
 }

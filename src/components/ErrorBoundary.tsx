@@ -1,6 +1,12 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
+// Track error counts to prevent redirect loops
+const ERROR_COUNT_KEY = 'errorBoundary_errorCount';
+const ERROR_TIME_KEY = 'errorBoundary_lastError';
+const MAX_ERRORS_BEFORE_BLOCKING = 3;
+const ERROR_RESET_INTERVAL_MS = 30000; // Reset error count after 30 seconds
+
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
@@ -11,6 +17,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  isLoopDetected: boolean;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -18,9 +25,10 @@ export class ErrorBoundary extends Component<Props, State> {
     hasError: false,
     error: null,
     errorInfo: null,
+    isLoopDetected: false,
   };
 
-  public static getDerivedStateFromError(error: Error): State {
+  public static getDerivedStateFromError(error: Error): Partial<State> {
     return {
       hasError: true,
       error,
@@ -32,10 +40,14 @@ export class ErrorBoundary extends Component<Props, State> {
     // Log error to console
     console.error('ErrorBoundary caught an error:', error, errorInfo);
 
+    // Check for redirect loops
+    const isLoopDetected = this.checkForLoop();
+
     // Update state with error info
     this.setState({
       error,
       errorInfo,
+      isLoopDetected,
     });
 
     // Call optional error handler
@@ -44,19 +56,58 @@ export class ErrorBoundary extends Component<Props, State> {
     }
   }
 
+  private checkForLoop(): boolean {
+    try {
+      const lastErrorTime = sessionStorage.getItem(ERROR_TIME_KEY);
+      const errorCount = parseInt(sessionStorage.getItem(ERROR_COUNT_KEY) || '0', 10);
+      const now = Date.now();
+
+      // Reset count if enough time has passed
+      if (lastErrorTime && now - parseInt(lastErrorTime, 10) > ERROR_RESET_INTERVAL_MS) {
+        sessionStorage.setItem(ERROR_COUNT_KEY, '1');
+        sessionStorage.setItem(ERROR_TIME_KEY, now.toString());
+        return false;
+      }
+
+      // Increment error count
+      const newCount = errorCount + 1;
+      sessionStorage.setItem(ERROR_COUNT_KEY, newCount.toString());
+      sessionStorage.setItem(ERROR_TIME_KEY, now.toString());
+
+      return newCount >= MAX_ERRORS_BEFORE_BLOCKING;
+    } catch {
+      // sessionStorage might not be available
+      return false;
+    }
+  }
+
+  private clearLoopTracking(): void {
+    try {
+      sessionStorage.removeItem(ERROR_COUNT_KEY);
+      sessionStorage.removeItem(ERROR_TIME_KEY);
+    } catch {
+      // Ignore
+    }
+  }
+
   private handleReload = (): void => {
     window.location.reload();
   };
 
   private handleGoHome = (): void => {
-    window.location.href = '/';
+    // Clear error state before navigating to prevent loops
+    this.clearLoopTracking();
+    // Use replace instead of href to avoid back button issues
+    window.location.replace('/');
   };
 
   private handleRetry = (): void => {
+    this.clearLoopTracking();
     this.setState({
       hasError: false,
       error: null,
       errorInfo: null,
+      isLoopDetected: false,
     });
   };
 
@@ -94,7 +145,9 @@ export class ErrorBoundary extends Component<Props, State> {
               className="mb-6"
               style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}
             >
-              An unexpected error occurred. Please try refreshing the page or contact support if the problem persists.
+              {this.state.isLoopDetected
+                ? 'Multiple errors detected. This may indicate a persistent issue. Please try clearing your browser data or contact support.'
+                : 'An unexpected error occurred. Please try refreshing the page or contact support if the problem persists.'}
             </p>
 
             {/* Error details (collapsed by default) */}

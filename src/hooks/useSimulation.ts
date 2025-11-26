@@ -148,6 +148,11 @@ export function useSimulationProgress(simulationId: string | null) {
   // Track mounted state to prevent setState on unmounted component
   const isMountedRef = useRef<boolean>(true);
 
+  // Store simulationId in ref to avoid stale closures and unnecessary effect re-runs
+  const simulationIdRef = useRef<string | null>(simulationId);
+  simulationIdRef.current = simulationId;
+
+  // Stable message handler that doesn't change on simulationId changes
   const handleMessage = useCallback((message: SimulationWebSocketMessage) => {
     // Prevent setState on unmounted component
     if (!isMountedRef.current) return;
@@ -219,9 +224,9 @@ export function useSimulationProgress(simulationId: string | null) {
             message: `Simulation complete - Pass rate: ${message.passRate.toFixed(1)}%`,
           },
         ]);
-        // Refresh simulation data to get final results
-        if (simulationId) {
-          simulationService.getById(simulationId).then((sim) => {
+        // Refresh simulation data to get final results - use ref to get current simulationId
+        if (simulationIdRef.current) {
+          simulationService.getById(simulationIdRef.current).then((sim) => {
             if (isMountedRef.current) {
               setSimulation(sim);
             }
@@ -241,7 +246,7 @@ export function useSimulationProgress(simulationId: string | null) {
         ]);
         break;
     }
-  }, [simulationId]);
+  }, []); // Empty deps - uses refs for values that change
 
   // Set mounted state on mount/unmount
   useEffect(() => {
@@ -317,7 +322,7 @@ export function useSimulationProgress(simulationId: string | null) {
     return () => {
       websocketService.disconnectFromSimulation(simulationId);
     };
-  }, [simulationId, handleMessage]);
+  }, [simulationId]); // Removed handleMessage - it's stable now with empty deps
 
   // Update elapsed time periodically
   useEffect(() => {

@@ -75,21 +75,28 @@ class ApiService {
     return JSON.parse(text) as T;
   }
 
-  private createTimeoutSignal(timeout: number, existingSignal?: AbortSignal): AbortSignal {
+  private createTimeoutSignal(
+    timeout: number,
+    existingSignal?: AbortSignal
+  ): { signal: AbortSignal; cleanup: () => void } {
     const controller = new AbortController();
 
     const timeoutId = setTimeout(() => {
       controller.abort(new Error('Request timeout'));
     }, timeout);
 
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+    };
+
     if (existingSignal) {
       existingSignal.addEventListener('abort', () => {
-        clearTimeout(timeoutId);
+        cleanup();
         controller.abort(existingSignal.reason);
       });
     }
 
-    return controller.signal;
+    return { signal: controller.signal, cleanup };
   }
 
   async get<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
@@ -99,7 +106,7 @@ class ApiService {
       ...options.headers,
     };
 
-    const signal = this.createTimeoutSignal(
+    const { signal, cleanup } = this.createTimeoutSignal(
       options.timeout || this.defaultTimeout,
       options.signal
     );
@@ -118,6 +125,8 @@ class ApiService {
         console.error(`[API Network Error] GET ${url}`, error.message);
       }
       throw error;
+    } finally {
+      cleanup();
     }
   }
 
@@ -128,7 +137,7 @@ class ApiService {
       ...options.headers,
     };
 
-    const signal = this.createTimeoutSignal(
+    const { signal, cleanup } = this.createTimeoutSignal(
       options.timeout || this.defaultTimeout,
       options.signal
     );
@@ -147,6 +156,8 @@ class ApiService {
         console.error(`[API Network Error] POST ${url}`, error.message);
       }
       throw error;
+    } finally {
+      cleanup();
     }
   }
 
@@ -157,7 +168,7 @@ class ApiService {
       ...options.headers,
     };
 
-    const signal = this.createTimeoutSignal(
+    const { signal, cleanup } = this.createTimeoutSignal(
       options.timeout || this.defaultTimeout,
       options.signal
     );
@@ -176,6 +187,8 @@ class ApiService {
         console.error(`[API Network Error] PUT ${url}`, error.message);
       }
       throw error;
+    } finally {
+      cleanup();
     }
   }
 
@@ -186,7 +199,7 @@ class ApiService {
       ...options.headers,
     };
 
-    const signal = this.createTimeoutSignal(
+    const { signal, cleanup } = this.createTimeoutSignal(
       options.timeout || this.defaultTimeout,
       options.signal
     );
@@ -204,17 +217,20 @@ class ApiService {
         console.error(`[API Network Error] DELETE ${url}`, error.message);
       }
       throw error;
+    } finally {
+      cleanup();
     }
   }
 
   // Health check
   async checkHealth(): Promise<{ status: string }> {
+    const { signal, cleanup } = this.createTimeoutSignal(5000);
     try {
       const actuatorUrl = getActuatorBaseUrl();
       const response = await fetch(`${actuatorUrl}/actuator/health`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
-        signal: this.createTimeoutSignal(5000),
+        signal,
       });
 
       if (!response.ok) {
@@ -225,6 +241,8 @@ class ApiService {
       return { status: data.status || 'UNKNOWN' };
     } catch {
       return { status: 'DOWN' };
+    } finally {
+      cleanup();
     }
   }
 

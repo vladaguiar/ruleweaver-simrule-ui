@@ -21,6 +21,8 @@ class SimulationWebSocket {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private connectionTimeout = 10000; // 10 second connection timeout
+  private connectionTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private status: WebSocketStatus = 'disconnected';
 
   constructor(simulationId: string, callbacks: WebSocketCallbacks) {
@@ -36,10 +38,25 @@ class SimulationWebSocket {
     const wsUrl = `${apiConfig.wsBaseUrl}${WS_ENDPOINTS.SIMULATION(this.simulationId)}`;
     this.setStatus('connecting');
 
+    // Clear any existing timeout
+    this.clearConnectionTimeout();
+
     try {
       this.ws = new WebSocket(wsUrl);
 
+      // Set connection timeout
+      this.connectionTimeoutId = setTimeout(() => {
+        if (this.status === 'connecting') {
+          console.warn('WebSocket connection timeout - closing and retrying');
+          this.ws?.close();
+          this.setStatus('error');
+          this.callbacks.onError?.(new Event('timeout'));
+          this.attemptReconnect();
+        }
+      }, this.connectionTimeout);
+
       this.ws.onopen = () => {
+        this.clearConnectionTimeout();
         this.reconnectAttempts = 0;
         this.setStatus('connected');
       };
@@ -54,17 +71,27 @@ class SimulationWebSocket {
       };
 
       this.ws.onerror = (error) => {
+        this.clearConnectionTimeout();
         this.setStatus('error');
         this.callbacks.onError?.(error);
       };
 
       this.ws.onclose = () => {
+        this.clearConnectionTimeout();
         this.setStatus('disconnected');
         this.attemptReconnect();
       };
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
+      this.clearConnectionTimeout();
       this.setStatus('error');
+    }
+  }
+
+  private clearConnectionTimeout(): void {
+    if (this.connectionTimeoutId) {
+      clearTimeout(this.connectionTimeoutId);
+      this.connectionTimeoutId = null;
     }
   }
 
@@ -107,6 +134,7 @@ class SimulationWebSocket {
   }
 
   disconnect(): void {
+    this.clearConnectionTimeout();
     if (this.ws) {
       this.ws.close();
       this.ws = null;

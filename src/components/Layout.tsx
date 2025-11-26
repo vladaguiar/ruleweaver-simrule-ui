@@ -2,6 +2,7 @@ import image_59e9396d40de986427c610e93570952e90e5ca14 from 'figma:asset/59e9396d
 import React, { useState } from 'react';
 import { Menu, Search, Bell, Settings, User, ChevronDown, LayoutDashboard, ClipboardList, Play, BarChart3, Target, Database, Settings as SettingsIcon, Moon, Sun } from 'lucide-react';
 import logoImage from 'figma:asset/158e83f25311585383422c644adbd27e0e9a7b0b.png';
+import { useAppContext } from '@/contexts/AppContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,7 +23,7 @@ const menuItems = [
 export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const { isDarkMode: darkMode, toggleDarkMode } = useAppContext();
 
   return (
     <div className={`min-h-screen bg-[var(--color-surface)] ${darkMode ? 'dark' : ''}`}>
@@ -60,7 +61,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setDarkMode(!darkMode)}
+            onClick={toggleDarkMode}
             className="p-2 hover:bg-white/10 rounded transition-colors"
             title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >

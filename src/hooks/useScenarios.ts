@@ -1,6 +1,6 @@
 // useScenarios Hook - Custom hook for scenario management
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { scenarioService } from '@/services';
 import type {
   ScenarioResponse,
@@ -57,6 +57,7 @@ export function useScenarios(filters?: ScenarioFilters): UseScenariosState & Use
   }, []);
 
   const create = useCallback(async (scenario: CreateScenarioRequest): Promise<ScenarioResponse> => {
+    setError(null);
     const created = await scenarioService.create(scenario);
     setScenarios((prev) => [...prev, created]);
     return created;
@@ -64,6 +65,7 @@ export function useScenarios(filters?: ScenarioFilters): UseScenariosState & Use
 
   const update = useCallback(
     async (id: string, scenario: UpdateScenarioRequest): Promise<ScenarioResponse> => {
+      setError(null);
       const updated = await scenarioService.update(id, scenario);
       setScenarios((prev) => prev.map((s) => (s.id === id ? updated : s)));
       if (selectedScenario?.id === id) {
@@ -76,6 +78,7 @@ export function useScenarios(filters?: ScenarioFilters): UseScenariosState & Use
 
   const remove = useCallback(
     async (id: string): Promise<void> => {
+      setError(null);
       await scenarioService.delete(id);
       setScenarios((prev) => prev.filter((s) => s.id !== id));
       if (selectedScenario?.id === id) {
@@ -86,6 +89,7 @@ export function useScenarios(filters?: ScenarioFilters): UseScenariosState & Use
   );
 
   const clone = useCallback(async (id: string): Promise<ScenarioResponse> => {
+    setError(null);
     const cloned = await scenarioService.clone(id);
     setScenarios((prev) => [...prev, cloned]);
     return cloned;
@@ -93,10 +97,33 @@ export function useScenarios(filters?: ScenarioFilters): UseScenariosState & Use
 
   const bulkDelete = useCallback(
     async (ids: string[]): Promise<void> => {
-      await scenarioService.bulkDelete(ids);
-      setScenarios((prev) => prev.filter((s) => !ids.includes(s.id)));
-      if (selectedScenario && ids.includes(selectedScenario.id)) {
-        setSelectedScenario(null);
+      setError(null);
+      const deletedIds: string[] = [];
+      const errors: string[] = [];
+
+      // Delete one by one to track which ones succeed
+      for (const id of ids) {
+        try {
+          await scenarioService.delete(id);
+          deletedIds.push(id);
+        } catch (err) {
+          errors.push(`Failed to delete ${id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        }
+      }
+
+      // Update state with successfully deleted items
+      if (deletedIds.length > 0) {
+        setScenarios((prev) => prev.filter((s) => !deletedIds.includes(s.id)));
+        if (selectedScenario && deletedIds.includes(selectedScenario.id)) {
+          setSelectedScenario(null);
+        }
+      }
+
+      // If there were any errors, throw with details
+      if (errors.length > 0) {
+        throw new Error(
+          `Deleted ${deletedIds.length}/${ids.length} scenarios. Errors: ${errors.join('; ')}`
+        );
       }
     },
     [selectedScenario]
@@ -159,6 +186,14 @@ export function useScenario(id: string | null) {
   const [scenario, setScenario] = useState<ScenarioResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!id) {
@@ -170,11 +205,15 @@ export function useScenario(id: string | null) {
     setError(null);
     try {
       const data = await scenarioService.getById(id);
+      if (!isMountedRef.current) return;
       setScenario(data);
     } catch (err) {
+      if (!isMountedRef.current) return;
       setError(err instanceof Error ? err.message : 'Failed to load scenario');
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [id]);
 
@@ -194,11 +233,19 @@ export function useScenarioCounts() {
     ARCHIVED: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     const loadCounts = async () => {
       try {
+        if (!isMountedRef.current) return;
+        setError(null);
         const scenarios = await scenarioService.getAll();
+        // Check if still mounted after async operation
+        if (!isMountedRef.current) return;
         const newCounts: Record<ScenarioStatus | 'all', number> = {
           all: scenarios.length,
           ACTIVE: 0,
@@ -209,12 +256,22 @@ export function useScenarioCounts() {
           newCounts[s.status]++;
         });
         setCounts(newCounts);
+      } catch (err) {
+        if (!isMountedRef.current) return;
+        setError(err instanceof Error ? err.message : 'Failed to load scenario counts');
+        console.error('Failed to load scenario counts:', err);
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
     loadCounts();
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
-  return { counts, loading };
+  return { counts, loading, error };
 }

@@ -9,9 +9,8 @@ export interface ApiConfig {
 }
 
 // Get environment variables with fallbacks
-const getEnvVar = (key: string, defaultValue: string): string => {
-  // @ts-expect-error - Vite uses import.meta.env
-  return import.meta.env?.[key] || defaultValue;
+const getEnvVar = (key: keyof ImportMetaEnv, defaultValue: string): string => {
+  return import.meta.env[key] ?? defaultValue;
 };
 
 // Development configuration
@@ -89,9 +88,11 @@ export const API_ENDPOINTS = {
   METRICS: '/actuator/metrics',
 } as const;
 
-// Actuator base URL (without /v1)
+// Actuator base URL (Spring Boot actuators are under /api)
 export const getActuatorBaseUrl = (): string => {
-  return apiConfig.baseUrl.replace('/api/v1', '/api');
+  // Strip /v1 to get the /api URL for Spring Boot actuators
+  // Actuator endpoints are at /api/actuator/health, not /actuator/health
+  return apiConfig.baseUrl.replace('/v1', '');
 };
 
 // WebSocket Endpoints
