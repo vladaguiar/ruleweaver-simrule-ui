@@ -12,3 +12,4 @@ export {
   type WebSocketStatus,
   type WebSocketCallbacks,
 } from './websocket.service';
+export { statisticsService, StatisticsService, type DailyActivity } from './statistics.service';

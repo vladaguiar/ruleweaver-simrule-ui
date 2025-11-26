@@ -3,6 +3,7 @@ import { TrendingUp, Activity, Target, CheckCircle, Plus, RefreshCw, AlertCircle
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useScenarioCounts } from '@/hooks/useScenarios';
 import { useSimulations, useSimulationStats } from '@/hooks/useSimulation';
+import { useActivityStats } from '@/hooks/useStatistics';
 import { useAppContext } from '@/contexts/AppContext';
 import { simulationService, scenarioService, coverageService } from '@/services';
 import type { SimulationResponse } from '@/types/api.types';
@@ -39,6 +40,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   // Get data from hooks
   const { counts: scenarioCounts, loading: scenariosLoading } = useScenarioCounts();
   const { stats: simStats, loading: statsLoading } = useSimulationStats();
+  const { activityData, loading: activityLoading } = useActivityStats();
   const { apiStatus, checkApiConnection } = useAppContext();
 
   // Recent simulations state
@@ -204,17 +206,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       icon: CheckCircle,
       color: 'var(--color-info)',
     },
-  ];
-
-  // Mock activity data - in production would come from API
-  const activityData = [
-    { date: 'Mon', tests: 24, passed: 22 },
-    { date: 'Tue', tests: 31, passed: 28 },
-    { date: 'Wed', tests: 28, passed: 26 },
-    { date: 'Thu', tests: 35, passed: 32 },
-    { date: 'Fri', tests: 42, passed: 38 },
-    { date: 'Sat', tests: 18, passed: 17 },
-    { date: 'Sun', tests: 15, passed: 15 },
   ];
 
   // Coverage data from API

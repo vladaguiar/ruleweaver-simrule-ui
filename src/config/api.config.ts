@@ -83,6 +83,9 @@ export const API_ENDPOINTS = {
   COVERAGE: (ruleSet: string) => `/coverage/${ruleSet}`,
   COVERAGE_LATEST: (ruleSet: string) => `/coverage/${ruleSet}/latest`,
 
+  // Statistics
+  STATISTICS_ACTIVITY: '/statistics/activity',
+
   // Health - actuator is under /api not /api/v1
   HEALTH: '/actuator/health',
   METRICS: '/actuator/metrics',
