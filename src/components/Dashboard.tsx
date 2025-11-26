@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Activity, Target, CheckCircle, Plus, RefreshCw, AlertCircle, Wifi, WifiOff, ChevronDown, Pause, Play } from 'lucide-react';
+import { Activity, Target, CheckCircle, Plus, RefreshCw, AlertCircle, Wifi, WifiOff, Pause, Play } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useScenarioCounts } from '@/hooks/useScenarios';
 import { useSimulations, useSimulationStats } from '@/hooks/useSimulation';
@@ -52,7 +52,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   // Rule set and coverage state
   const { ruleSetIds: availableRuleSets, loading: ruleSetsLoading } = useRuleSets();
-  const [selectedRuleSet, setSelectedRuleSet] = useState<string | null>(null);
   const [coverageMetrics, setCoverageMetrics] = useState<{
     percentage: number;
     covered: number;
@@ -75,39 +74,65 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
 
-  // Set default selected rule set when rule sets are loaded
+  // Fetch aggregate coverage across all rule sets
   useEffect(() => {
-    if (availableRuleSets.length > 0 && !selectedRuleSet) {
-      setSelectedRuleSet(availableRuleSets[0]);
+    if (ruleSetsLoading) {
+      return;
     }
-  }, [availableRuleSets, selectedRuleSet]);
 
-  // Fetch coverage when selected rule set changes
-  useEffect(() => {
-    if (!selectedRuleSet) {
+    if (availableRuleSets.length === 0) {
       setCoverageLoading(false);
+      setCoverageMetrics(null);
       return;
     }
 
     const abortController = new AbortController();
     setCoverageLoading(true);
 
-    const loadCoverage = async () => {
+    const loadAggregateCoverage = async () => {
       try {
-        const report = await coverageService.getLatest(selectedRuleSet, { signal: abortController.signal });
-        if (!abortController.signal.aborted) {
+        // Fetch coverage for all rule sets in parallel
+        const coveragePromises = availableRuleSets.map((ruleSet) =>
+          coverageService.getLatest(ruleSet, { signal: abortController.signal }).catch(() => null)
+        );
+
+        const coverageResults = await Promise.all(coveragePromises);
+
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        // Filter out failed requests and calculate aggregate
+        const validReports = coverageResults.filter((report) => report !== null);
+
+        if (validReports.length === 0) {
+          setCoverageMetrics(null);
+        } else {
+          // Calculate totals across all rule sets
+          const totals = validReports.reduce(
+            (acc, report) => ({
+              covered: acc.covered + report.metrics.rulesTested,
+              untested: acc.untested + report.metrics.rulesUntested,
+              total: acc.total + report.metrics.totalRules,
+            }),
+            { covered: 0, untested: 0, total: 0 }
+          );
+
+          // Calculate average coverage percentage
+          const avgPercentage = totals.total > 0 ? (totals.covered / totals.total) * 100 : 0;
+
           setCoverageMetrics({
-            percentage: report.metrics.coveragePercentage,
-            covered: report.metrics.rulesTested,
-            untested: report.metrics.rulesUntested,
-            total: report.metrics.totalRules,
+            percentage: avgPercentage,
+            covered: totals.covered,
+            untested: totals.untested,
+            total: totals.total,
           });
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           return;
         }
-        console.error('Failed to load coverage:', error);
+        console.error('Failed to load aggregate coverage:', error);
         if (!abortController.signal.aborted) {
           setCoverageMetrics(null);
         }
@@ -117,12 +142,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         }
       }
     };
-    loadCoverage();
+    loadAggregateCoverage();
 
     return () => {
       abortController.abort();
     };
-  }, [selectedRuleSet]);
+  }, [availableRuleSets, ruleSetsLoading]);
 
   // Load recent simulations with AbortController for cleanup
   useEffect(() => {
@@ -353,27 +378,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </span>
             )}
           </div>
-          {/* Rule Set Selector */}
-          {availableRuleSets.length > 0 && (
-            <div className="relative">
-              <select
-                value={selectedRuleSet || ''}
-                onChange={(e) => setSelectedRuleSet(e.target.value)}
-                disabled={ruleSetsLoading}
-                className="appearance-none pl-3 pr-8 py-1.5 border rounded text-sm bg-[var(--color-background)] cursor-pointer hover:border-[var(--color-primary)] transition-colors"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', minWidth: '150px' }}
-              >
-                {availableRuleSets.map((rs) => (
-                  <option key={rs} value={rs}>{rs}</option>
-                ))}
-              </select>
-              <ChevronDown
-                size={14}
-                className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
-                style={{ color: 'var(--color-text-secondary)' }}
-              />
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Auto-refresh indicator and toggle */}
@@ -491,17 +495,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <div className="flex flex-col items-center justify-center" style={{ height: '250px' }}>
               <Target size={48} style={{ color: 'var(--color-text-muted)', marginBottom: '16px' }} />
               <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-                {availableRuleSets.length === 0 ? 'No rule sets available' : 'No coverage data available'}
+                {availableRuleSets.length === 0 ? 'No rule sets available' : 'No coverage reports generated yet'}
               </p>
-              {availableRuleSets.length > 0 && (
-                <button
-                  onClick={() => onNavigate('coverage')}
-                  className="mt-4 px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[#1D4261] transition-colors"
-                  style={{ fontSize: '14px' }}
-                >
-                  Generate Coverage Report
-                </button>
-              )}
+              <button
+                onClick={() => onNavigate('coverage')}
+                className="mt-4 px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[#1D4261] transition-colors"
+                style={{ fontSize: '14px' }}
+              >
+                Generate Coverage Report
+              </button>
             </div>
           ) : (
             <>
