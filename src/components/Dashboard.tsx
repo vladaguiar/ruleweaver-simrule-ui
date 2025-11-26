@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Activity, Target, CheckCircle, Plus, RefreshCw, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { TrendingUp, Activity, Target, CheckCircle, Plus, RefreshCw, AlertCircle, Wifi, WifiOff, ChevronDown } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useScenarioCounts } from '@/hooks/useScenarios';
 import { useSimulations, useSimulationStats } from '@/hooks/useSimulation';
 import { useAppContext } from '@/contexts/AppContext';
-import { simulationService } from '@/services';
+import { simulationService, scenarioService, coverageService } from '@/services';
 import type { SimulationResponse } from '@/types/api.types';
 
 interface DashboardProps {
@@ -45,6 +45,91 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [recentSimulations, setRecentSimulations] = useState<SimulationResponse[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Rule set and coverage state
+  const [availableRuleSets, setAvailableRuleSets] = useState<string[]>([]);
+  const [selectedRuleSet, setSelectedRuleSet] = useState<string | null>(null);
+  const [ruleSetsLoading, setRuleSetsLoading] = useState(true);
+  const [coverageMetrics, setCoverageMetrics] = useState<{
+    percentage: number;
+    covered: number;
+    untested: number;
+    total: number;
+  } | null>(null);
+  const [coverageLoading, setCoverageLoading] = useState(true);
+
+  // Load available rule sets on mount
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    const loadRuleSets = async () => {
+      try {
+        const ruleSets = await scenarioService.getRuleSets({ signal: abortController.signal });
+        if (!abortController.signal.aborted) {
+          setAvailableRuleSets(ruleSets);
+          if (ruleSets.length > 0) {
+            setSelectedRuleSet(ruleSets[0]); // Default to first
+          }
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        console.error('Failed to load rule sets:', error);
+      } finally {
+        if (!abortController.signal.aborted) {
+          setRuleSetsLoading(false);
+        }
+      }
+    };
+    loadRuleSets();
+
+    return () => {
+      abortController.abort();
+    };
+  }, []);
+
+  // Fetch coverage when selected rule set changes
+  useEffect(() => {
+    if (!selectedRuleSet) {
+      setCoverageLoading(false);
+      return;
+    }
+
+    const abortController = new AbortController();
+    setCoverageLoading(true);
+
+    const loadCoverage = async () => {
+      try {
+        const report = await coverageService.getLatest(selectedRuleSet, { signal: abortController.signal });
+        if (!abortController.signal.aborted) {
+          setCoverageMetrics({
+            percentage: report.metrics.coveragePercentage,
+            covered: report.metrics.rulesTested,
+            untested: report.metrics.rulesUntested,
+            total: report.metrics.totalRules,
+          });
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        console.error('Failed to load coverage:', error);
+        if (!abortController.signal.aborted) {
+          setCoverageMetrics(null);
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setCoverageLoading(false);
+        }
+      }
+    };
+    loadCoverage();
+
+    return () => {
+      abortController.abort();
+    };
+  }, [selectedRuleSet]);
 
   // Load recent simulations with AbortController for cleanup
   useEffect(() => {
@@ -108,8 +193,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     },
     {
       label: 'Coverage Score',
-      value: '87%', // Would come from coverage API
-      trend: '+5%',
+      value: coverageLoading ? '...' : coverageMetrics ? `${Math.round(coverageMetrics.percentage)}%` : 'N/A',
       icon: Target,
       color: 'var(--color-success)',
     },
@@ -133,11 +217,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     { date: 'Sun', tests: 15, passed: 15 },
   ];
 
-  // Coverage data - would come from coverage API
-  const coverageData = [
-    { name: 'Covered', value: 136, color: '#C3E770' },
-    { name: 'Untested', value: 20, color: '#EF6F53' },
-  ];
+  // Coverage data from API
+  const coverageData = coverageMetrics ? [
+    { name: 'Covered', value: coverageMetrics.covered, color: '#C3E770' },
+    { name: 'Untested', value: coverageMetrics.untested, color: '#EF6F53' },
+  ] : [];
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -160,6 +244,27 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </span>
             )}
           </div>
+          {/* Rule Set Selector */}
+          {availableRuleSets.length > 0 && (
+            <div className="relative">
+              <select
+                value={selectedRuleSet || ''}
+                onChange={(e) => setSelectedRuleSet(e.target.value)}
+                disabled={ruleSetsLoading}
+                className="appearance-none pl-3 pr-8 py-1.5 border rounded text-sm bg-[var(--color-background)] cursor-pointer hover:border-[var(--color-primary)] transition-colors"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)', minWidth: '150px' }}
+              >
+                {availableRuleSets.map((rs) => (
+                  <option key={rs} value={rs}>{rs}</option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: 'var(--color-text-secondary)' }}
+              />
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -247,44 +352,69 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         {/* Coverage Chart */}
         <div className="bg-[var(--color-background)] rounded-lg p-6" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
           <h3 className="mb-4">Rule Coverage Overview</h3>
-          <div className="flex items-center justify-center">
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={coverageData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
+          {coverageLoading ? (
+            <div className="flex items-center justify-center" style={{ height: '250px' }}>
+              <RefreshCw className="animate-spin" size={24} style={{ color: 'var(--color-primary)' }} />
+              <span className="ml-2" style={{ color: 'var(--color-text-secondary)' }}>Loading coverage...</span>
+            </div>
+          ) : coverageData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center" style={{ height: '250px' }}>
+              <Target size={48} style={{ color: 'var(--color-text-muted)', marginBottom: '16px' }} />
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>
+                {availableRuleSets.length === 0 ? 'No rule sets available' : 'No coverage data available'}
+              </p>
+              {availableRuleSets.length > 0 && (
+                <button
+                  onClick={() => onNavigate('coverage')}
+                  className="mt-4 px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[#1D4261] transition-colors"
+                  style={{ fontSize: '14px' }}
                 >
-                  {coverageData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '8px',
-                    boxShadow: 'var(--shadow-2)',
-                    color: 'var(--color-text-primary)',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center gap-6 mt-4">
-            {coverageData.map((item, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                  {item.name}: {item.value}
-                </span>
+                  Generate Coverage Report
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={coverageData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {coverageData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'var(--color-surface)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: '8px',
+                        boxShadow: 'var(--shadow-2)',
+                        color: 'var(--color-text-primary)',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+              <div className="flex justify-center gap-6 mt-4">
+                {coverageData.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                    <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+                      {item.name}: {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

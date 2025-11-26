@@ -43,6 +43,7 @@ class CoverageService {
       totalRules: number;
       testedRules: number;
       untestedRules: number;
+      error?: string;
     }>
   > {
     const reports = await Promise.all(
@@ -56,13 +57,16 @@ class CoverageService {
             testedRules: report.metrics.rulesTested,
             untestedRules: report.metrics.rulesUntested,
           };
-        } catch {
+        } catch (err) {
+          // Log error and return with error indicator instead of silently failing
+          console.error(`Failed to get coverage for rule set "${ruleSet}":`, err);
           return {
             ruleSet,
             coveragePercentage: 0,
             totalRules: 0,
             testedRules: 0,
             untestedRules: 0,
+            error: err instanceof Error ? err.message : 'Failed to load coverage',
           };
         }
       })
@@ -81,6 +85,7 @@ class CoverageService {
     Array<{
       ruleSet: string;
       rules: RuleCoverageDto[];
+      error?: string;
     }>
   > {
     const reports = await Promise.all(
@@ -91,16 +96,19 @@ class CoverageService {
             ruleSet,
             rules: report.untestedRules,
           };
-        } catch {
+        } catch (err) {
+          console.error(`Failed to get untested rules for "${ruleSet}":`, err);
           return {
             ruleSet,
             rules: [],
+            error: err instanceof Error ? err.message : 'Failed to load',
           };
         }
       })
     );
 
-    return reports.filter((r) => r.rules.length > 0);
+    // Return all results, including failed ones with errors and empty successful ones
+    return reports;
   }
 
   /**
