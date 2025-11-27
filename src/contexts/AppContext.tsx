@@ -12,6 +12,7 @@ const defaultSettings: AppSettings = {
   defaultRuleSet: undefined,
   defaultPageSize: 10,
   autoRefreshInterval: 30000,
+  autoSaveInterval: 30000,
   theme: 'light',
   defaultExecutionMode: 'SEQUENTIAL',
   scenarioTimeoutSeconds: 60,

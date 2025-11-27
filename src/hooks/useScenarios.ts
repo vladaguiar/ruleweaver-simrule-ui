@@ -2,19 +2,30 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { scenarioService } from '@/services';
+import type { PaginationParams } from '@/services/scenario.service';
 import type {
   ScenarioResponse,
   CreateScenarioRequest,
   UpdateScenarioRequest,
   ScenarioFilters,
   ScenarioStatus,
+  PaginatedResponse,
 } from '@/types/api.types';
+
+export type { PaginationParams };
 
 export interface UseScenariosState {
   scenarios: ScenarioResponse[];
   loading: boolean;
   error: string | null;
   selectedScenario: ScenarioResponse | null;
+}
+
+export interface PaginationState {
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
 }
 
 export interface UseScenariosActions {
@@ -274,4 +285,112 @@ export function useScenarioCounts() {
   }, []);
 
   return { counts, loading, error };
+}
+
+// Hook for paginated scenarios
+export interface UsePaginatedScenariosOptions {
+  initialPage?: number;
+  initialPageSize?: number;
+  filters?: ScenarioFilters;
+}
+
+export interface UsePaginatedScenariosReturn {
+  scenarios: ScenarioResponse[];
+  loading: boolean;
+  error: string | null;
+  pagination: PaginationState;
+  setPage: (page: number) => void;
+  setPageSize: (size: number) => void;
+  refresh: () => Promise<void>;
+  goToFirstPage: () => void;
+  goToLastPage: () => void;
+  goToNextPage: () => void;
+  goToPreviousPage: () => void;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export function usePaginatedScenarios(
+  options?: UsePaginatedScenariosOptions
+): UsePaginatedScenariosReturn {
+  const [scenarios, setScenarios] = useState<ScenarioResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<PaginationState>({
+    page: options?.initialPage ?? 0,
+    size: options?.initialPageSize ?? 10,
+    totalElements: 0,
+    totalPages: 0,
+  });
+  const isMountedRef = useRef(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await scenarioService.getPaginated(
+        { page: pagination.page, size: pagination.size },
+        options?.filters
+      );
+      if (!isMountedRef.current) return;
+      setScenarios(result.content);
+      setPagination(prev => ({
+        ...prev,
+        totalElements: result.totalElements,
+        totalPages: result.totalPages,
+      }));
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setError(err instanceof Error ? err.message : 'Failed to load scenarios');
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [pagination.page, pagination.size, options?.filters]);
+
+  // Track mount state
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Load data when pagination changes
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const setPage = useCallback((page: number) => {
+    setPagination(prev => ({ ...prev, page: Math.max(0, Math.min(page, prev.totalPages - 1)) }));
+  }, []);
+
+  const setPageSize = useCallback((size: number) => {
+    setPagination(prev => ({ ...prev, size, page: 0 })); // Reset to first page when changing size
+  }, []);
+
+  const goToFirstPage = useCallback(() => setPage(0), [setPage]);
+  const goToLastPage = useCallback(() => setPage(pagination.totalPages - 1), [setPage, pagination.totalPages]);
+  const goToNextPage = useCallback(() => setPage(pagination.page + 1), [setPage, pagination.page]);
+  const goToPreviousPage = useCallback(() => setPage(pagination.page - 1), [setPage, pagination.page]);
+
+  const hasNextPage = pagination.page < pagination.totalPages - 1;
+  const hasPreviousPage = pagination.page > 0;
+
+  return {
+    scenarios,
+    loading,
+    error,
+    pagination,
+    setPage,
+    setPageSize,
+    refresh,
+    goToFirstPage,
+    goToLastPage,
+    goToNextPage,
+    goToPreviousPage,
+    hasNextPage,
+    hasPreviousPage,
+  };
 }
