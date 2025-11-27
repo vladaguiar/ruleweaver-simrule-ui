@@ -16,18 +16,30 @@ class RuleService {
       const rules = await apiService.get<RuleInfo[]>(endpoint, options);
       return rules;
     } catch (error) {
-      console.error('Failed to fetch rules:', error);
+      // Don't log AbortErrors - they're expected when requests are cancelled
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Failed to fetch rules:', error);
+      }
       throw error;
     }
   }
 
   /**
    * Get rules filtered by rule set
-   * Client-side filtering since API returns all rules
+   * API requires ruleSet query parameter
    */
   async getByRuleSet(ruleSet: string, options?: RequestOptions): Promise<RuleInfo[]> {
-    const allRules = await this.getAll(options);
-    return allRules.filter(rule => rule.ruleSet === ruleSet);
+    try {
+      const endpoint = `${API_ENDPOINTS.RULES}?ruleSet=${encodeURIComponent(ruleSet)}`;
+      const rules = await apiService.get<RuleInfo[]>(endpoint, options);
+      return rules;
+    } catch (error) {
+      // Don't log AbortErrors - they're expected when requests are cancelled
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Failed to fetch rules for rule set:', ruleSet, error);
+      }
+      throw error;
+    }
   }
 }
 
