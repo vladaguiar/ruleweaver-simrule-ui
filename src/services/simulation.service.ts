@@ -8,6 +8,7 @@ import type {
   ExecuteSimulationRequest,
   SimulationFilters,
   ExecutionMode,
+  CancellationResponse,
 } from '@/types/api.types';
 
 class SimulationService {
@@ -197,6 +198,14 @@ class SimulationService {
     const minutes = Math.floor(durationMs / 60000);
     const seconds = Math.floor((durationMs % 60000) / 1000);
     return `${minutes}m ${seconds}s`;
+  }
+
+  /**
+   * Cancel a running or pending simulation
+   */
+  async cancel(simulationId: string, options?: RequestOptions): Promise<CancellationResponse> {
+    const endpoint = API_ENDPOINTS.SIMULATION_CANCEL(simulationId);
+    return apiService.delete<CancellationResponse>(endpoint, options);
   }
 }
 

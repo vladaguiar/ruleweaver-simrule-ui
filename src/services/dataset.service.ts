@@ -7,6 +7,7 @@ import { API_ENDPOINTS } from '@/config/api.config';
 import type {
   DatasetResponse,
   UploadDatasetRequest,
+  UpdateDatasetRequest,
   DatasetFilters,
   DatasetFormat,
 } from '@/types/api.types';
@@ -176,6 +177,18 @@ class DatasetService {
       dataset,
       options
     );
+  }
+
+  /**
+   * Update an existing dataset
+   */
+  async update(
+    datasetId: string,
+    data: UpdateDatasetRequest,
+    options?: RequestOptions
+  ): Promise<DatasetResponse> {
+    const endpoint = API_ENDPOINTS.DATASET_BY_ID(datasetId);
+    return apiService.put<DatasetResponse, UpdateDatasetRequest>(endpoint, data, options);
   }
 
   /**

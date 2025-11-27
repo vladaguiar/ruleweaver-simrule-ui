@@ -1,5 +1,5 @@
 // WebSocket Service for SimRule UI
-// Handles real-time simulation progress updates
+// Handles real-time simulation progress updates using native WebSocket
 
 import { apiConfig } from '@/config/api.config';
 import { WS_ENDPOINTS } from '@/config/api.config';
@@ -10,7 +10,7 @@ export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'err
 export interface WebSocketCallbacks {
   onMessage: (message: SimulationWebSocketMessage) => void;
   onStatusChange?: (status: WebSocketStatus) => void;
-  onError?: (error: Event) => void;
+  onError?: (error: Error | Event) => void;
   onPermanentFailure?: () => void; // Called when max reconnect attempts reached
 }
 
@@ -35,14 +35,18 @@ class SimulationWebSocket {
       return;
     }
 
-    const wsUrl = `${apiConfig.wsBaseUrl}${WS_ENDPOINTS.SIMULATION(this.simulationId)}`;
+    // Convert http:// to ws:// for WebSocket connection
+    const wsUrl = apiConfig.wsBaseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+    const fullUrl = `${wsUrl}${WS_ENDPOINTS.WS}?simulationId=${this.simulationId}`;
+
+    console.log(`[WebSocket] Connecting to: ${fullUrl}`);
     this.setStatus('connecting');
 
     // Clear any existing timeout
     this.clearConnectionTimeout();
 
     try {
-      this.ws = new WebSocket(wsUrl);
+      this.ws = new WebSocket(fullUrl);
 
       // Set connection timeout
       this.connectionTimeoutId = setTimeout(() => {
@@ -63,10 +67,12 @@ class SimulationWebSocket {
 
       this.ws.onmessage = (event) => {
         try {
+          console.log('[WebSocket] Received message:', event.data);
           const message = JSON.parse(event.data) as SimulationWebSocketMessage;
+          console.log('[WebSocket] Parsed message:', message);
           this.callbacks.onMessage(message);
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          console.error('[WebSocket] Failed to parse message:', error, 'Raw data:', event.data);
         }
       };
 
@@ -76,9 +82,17 @@ class SimulationWebSocket {
         this.callbacks.onError?.(error);
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (event) => {
         this.clearConnectionTimeout();
         this.setStatus('disconnected');
+
+        // Don't reconnect if close was clean (code 1000 = normal closure)
+        // This happens when backend completes the stream
+        if (event.code === 1000) {
+          console.log('[WebSocket] Connection closed normally by server');
+          return;
+        }
+
         this.attemptReconnect();
       };
     } catch (error) {

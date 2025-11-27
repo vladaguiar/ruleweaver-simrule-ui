@@ -8,7 +8,18 @@ import type {
   CreateScenarioRequest,
   UpdateScenarioRequest,
   ScenarioFilters,
+  PaginatedResponse,
+  BulkDeleteRequest,
+  BulkDeleteResponse,
 } from '@/types/api.types';
+
+// Pagination parameters
+export interface PaginationParams {
+  page?: number;
+  size?: number;
+  sort?: string;
+  direction?: 'ASC' | 'DESC';
+}
 
 class ScenarioService {
   /**
@@ -32,6 +43,89 @@ class ScenarioService {
     }
 
     return apiService.get<ScenarioResponse[]>(endpoint, options);
+  }
+
+  /**
+   * Get paginated scenarios with optional filtering
+   */
+  async getPaginated(
+    pagination?: PaginationParams,
+    filters?: ScenarioFilters,
+    options?: RequestOptions
+  ): Promise<PaginatedResponse<ScenarioResponse>> {
+    let endpoint = API_ENDPOINTS.SCENARIOS;
+
+    // Build query string from pagination and filters
+    const params = new URLSearchParams();
+
+    // Pagination params
+    if (pagination?.page !== undefined) {
+      params.append('page', pagination.page.toString());
+    }
+    if (pagination?.size !== undefined) {
+      params.append('size', pagination.size.toString());
+    }
+    if (pagination?.sort) {
+      params.append('sort', pagination.sort);
+    }
+    if (pagination?.direction) {
+      params.append('direction', pagination.direction);
+    }
+
+    // Filter params
+    if (filters?.status) {
+      params.append('status', filters.status);
+    }
+    if (filters?.ruleSet) {
+      params.append('ruleSet', filters.ruleSet);
+    }
+
+    const queryString = params.toString();
+    if (queryString) {
+      endpoint += `?${queryString}`;
+    }
+
+    try {
+      // Try to get paginated response from server
+      const response = await apiService.get<PaginatedResponse<ScenarioResponse>>(endpoint, options);
+
+      // If response looks like a paginated response, return it
+      if ('content' in response && 'totalElements' in response) {
+        return response;
+      }
+
+      // If server returns array (non-paginated), convert to paginated format
+      const scenarios = response as unknown as ScenarioResponse[];
+      const page = pagination?.page ?? 0;
+      const size = pagination?.size ?? 10;
+      const start = page * size;
+      const end = start + size;
+      const paginatedContent = scenarios.slice(start, end);
+
+      return {
+        content: paginatedContent,
+        totalElements: scenarios.length,
+        totalPages: Math.ceil(scenarios.length / size),
+        page,
+        size,
+      };
+    } catch {
+      // Fallback: get all and paginate client-side
+      const scenarios = await this.getAll(filters, options);
+      const page = pagination?.page ?? 0;
+      const size = pagination?.size ?? 10;
+      const start = page * size;
+      const end = start + size;
+      const paginatedContent = scenarios.slice(start, end);
+
+      return {
+        content: paginatedContent,
+        totalElements: scenarios.length,
+        totalPages: Math.ceil(scenarios.length / size),
+        page,
+        size,
+      };
+    }
   }
 
   /**
@@ -85,10 +179,50 @@ class ScenarioService {
   }
 
   /**
-   * Bulk delete scenarios
+   * Bulk delete scenarios using efficient API endpoint
+   * Falls back to individual deletes if bulk endpoint not available
    */
-  async bulkDelete(scenarioIds: string[], options?: RequestOptions): Promise<void> {
-    await Promise.all(scenarioIds.map((id) => this.delete(id, options)));
+  async bulkDelete(scenarioIds: string[], options?: RequestOptions): Promise<BulkDeleteResponse> {
+    try {
+      // Try efficient bulk delete API
+      const request: BulkDeleteRequest = { ids: scenarioIds };
+      return await apiService.delete<BulkDeleteResponse>(
+        API_ENDPOINTS.SCENARIOS_BULK_DELETE,
+        { ...options, body: JSON.stringify(request) }
+      );
+    } catch (error: unknown) {
+      // Fallback to individual deletes if bulk endpoint not available (404)
+      const apiError = error as { status?: number };
+      if (apiError.status === 404) {
+        console.warn('Bulk delete endpoint not available, falling back to individual deletes');
+        const results = await Promise.allSettled(
+          scenarioIds.map((id) => this.delete(id, options))
+        );
+
+        const deletedIds: string[] = [];
+        const failures: { id: string; reason: string }[] = [];
+
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            deletedIds.push(scenarioIds[index]);
+          } else {
+            failures.push({
+              id: scenarioIds[index],
+              reason: result.reason?.message || 'Unknown error',
+            });
+          }
+        });
+
+        return {
+          totalRequested: scenarioIds.length,
+          successCount: deletedIds.length,
+          failureCount: failures.length,
+          deletedIds,
+          failures,
+        };
+      }
+      throw error;
+    }
   }
 
   /**
