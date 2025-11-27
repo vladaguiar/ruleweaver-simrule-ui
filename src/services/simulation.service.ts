@@ -3,6 +3,7 @@
 
 import { apiService, RequestOptions } from './api.service';
 import { API_ENDPOINTS } from '@/config/api.config';
+import { logger } from '@/utils/logger';
 import type {
   SimulationResponse,
   ExecuteSimulationRequest,
@@ -85,16 +86,27 @@ class SimulationService {
     } = {},
     options?: RequestOptions
   ): Promise<SimulationResponse> {
-    return this.execute(
-      {
-        name: config.name || `Batch Simulation - ${new Date().toISOString()}`,
-        scenarioIds,
-        executionMode: config.executionMode || 'SEQUENTIAL',
-        concurrency: config.concurrency,
-        timeoutSeconds: config.timeoutSeconds,
-      },
-      options
-    );
+    // Log execution configuration
+    logger.info('SimulationService', 'Preparing simulation execution', {
+      scenarioCount: scenarioIds.length,
+      executionMode: config.executionMode || 'SEQUENTIAL',
+      concurrency: config.concurrency,
+      timeoutSeconds: config.timeoutSeconds,
+      name: config.name,
+    });
+
+    const request: ExecuteSimulationRequest = {
+      name: config.name || `Batch Simulation - ${new Date().toISOString()}`,
+      scenarioIds,
+      executionMode: config.executionMode || 'SEQUENTIAL',
+      concurrency: config.concurrency,
+      timeoutSeconds: config.timeoutSeconds,
+    };
+
+    // Log the exact request payload being sent
+    logger.debug('SimulationService', 'Simulation request payload', request);
+
+    return this.execute(request, options);
   }
 
   /**

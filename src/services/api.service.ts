@@ -2,6 +2,7 @@
 // Provides core HTTP functionality with error handling, retries, and correlation tracking
 
 import { apiConfig, getDefaultHeaders, getActuatorBaseUrl } from '@/config/api.config';
+import { logger } from '@/utils/logger';
 
 export interface ApiError {
   status: number;
@@ -49,6 +50,14 @@ class ApiService {
         message: errorMessage,
         correlationId,
         details: errorDetails,
+      });
+
+      // Enhanced error logging with logger
+      logger.error('ApiService', `HTTP Error: ${method} ${url}`, {
+        status: response.status,
+        statusText: response.statusText,
+        correlationId,
+        errorDetails,
       });
 
       const error: ApiError = {
@@ -143,6 +152,9 @@ class ApiService {
     );
 
     try {
+      // Log the outgoing request
+      logger.logApiRequest('ApiService', 'POST', url, body, headers);
+
       const response = await fetch(url, {
         method: 'POST',
         headers,
@@ -150,10 +162,17 @@ class ApiService {
         signal,
       });
 
-      return this.handleResponse<T>(response, 'POST', url);
+      const responseData = await this.handleResponse<T>(response, 'POST', url);
+      const correlationId = response.headers.get('X-Correlation-ID') || undefined;
+
+      // Log the successful response
+      logger.logApiResponse('ApiService', 'POST', url, response.status, responseData, correlationId);
+
+      return responseData;
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {
         console.error(`[API Network Error] POST ${url}`, error.message);
+        logger.error('ApiService', `POST ${url} failed`, error);
       }
       throw error;
     } finally {
