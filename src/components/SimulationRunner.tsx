@@ -245,13 +245,36 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
       // Connect WebSocket for real-time updates
       wsConnectionRef.current = websocketService.connectToSimulation(response.id, {
         onMessage: handleWebSocketMessage,
-        onStatusChange: (status: WebSocketStatus) => {
+        onStatusChange: async (status: WebSocketStatus) => {
           if (status === 'connected') {
             setLogs(prev => [...prev, {
               type: 'info',
               time: new Date().toLocaleTimeString('en-US', { hour12: false }),
               message: 'Connected to simulation progress feed',
             }]);
+          } else if (status === 'disconnected') {
+            // When WebSocket closes, check if simulation is complete
+            try {
+              const sim = await simulationService.getById(response.id);
+              if (sim.status === 'COMPLETED' || sim.status === 'FAILED' || sim.status === 'CANCELLED') {
+                console.log('[SimulationRunner] Simulation finished:', sim.status);
+                setIsRunning(false);
+                stopTimer();
+                setProgress(100);
+
+                // Update results if we have metrics
+                if (sim.metrics) {
+                  setResults({
+                    pass: sim.metrics.passed || 0,
+                    fail: sim.metrics.failed || 0,
+                    warn: 0,
+                    total: sim.metrics.totalScenarios || 0,
+                  });
+                }
+              }
+            } catch (error) {
+              console.error('[SimulationRunner] Failed to check simulation status:', error);
+            }
           } else if (status === 'error') {
             setLogs(prev => [...prev, {
               type: 'warning',

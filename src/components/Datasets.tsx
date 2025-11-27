@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { Search, Upload, Eye, Download, Trash2, Database, X, FileJson, FileSpreadsheet, File, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Plus, Check } from 'lucide-react';
+import { Search, Upload, Eye, Download, Trash2, Database, X, FileJson, FileSpreadsheet, File, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Plus, Check, Edit } from 'lucide-react';
 import { useDatasets, useDatasetUpload, useDatasetPreview } from '@/hooks/useDatasets';
 import { useAppContext } from '@/contexts/AppContext';
 import type { DatasetResponse, DatasetFormat, DatasetFilters } from '@/types/api.types';
@@ -51,13 +51,13 @@ export function Datasets({ onNavigate }: DatasetsProps) {
   const handleDelete = async (datasetId: string) => {
     try {
       await remove(datasetId);
-      addNotification('success', 'Dataset deleted successfully');
+      addNotification({ type: 'success', title: 'Dataset Deleted', message: 'Dataset deleted successfully' });
       setShowDeleteConfirm(null);
       if (selectedDataset?.id === datasetId) {
         setSelectedDataset(null);
       }
     } catch (err) {
-      addNotification('error', err instanceof Error ? err.message : 'Failed to delete dataset');
+      addNotification({ type: 'error', title: 'Delete Failed', message: err instanceof Error ? err.message : 'Failed to delete dataset' });
     }
   };
 
@@ -73,7 +73,7 @@ export function Datasets({ onNavigate }: DatasetsProps) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    addNotification('success', `Downloaded ${dataset.name}`);
+    addNotification({ type: 'success', title: 'Download Complete', message: `Downloaded ${dataset.name}` });
   };
 
   // Format helpers
@@ -348,6 +348,17 @@ export function Datasets({ onNavigate }: DatasetsProps) {
                 >
                   <Eye size={16} />
                   View
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNavigate('dataset-editor', { datasetId: dataset.id });
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 border rounded hover:bg-[var(--color-surface)] transition-colors"
+                  style={{ borderColor: 'var(--color-border)', fontSize: '13px', color: 'var(--color-primary)' }}
+                >
+                  <Edit size={16} />
+                  Edit
                 </button>
                 <button
                   onClick={(e) => {
@@ -759,7 +770,7 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
 
     if (!validExtensions.includes(ext)) {
-      addNotification('error', 'Invalid file type. Please upload JSON, CSV, or Excel files.');
+      addNotification({ type: 'error', title: 'Invalid File', message: 'Invalid file type. Please upload JSON, CSV, or Excel files.' });
       return;
     }
 
@@ -770,7 +781,7 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
 
   const handleUpload = async () => {
     if (!selectedFile || !factType) {
-      addNotification('error', 'Please fill in all required fields');
+      addNotification({ type: 'error', title: 'Missing Fields', message: 'Please fill in all required fields' });
       return;
     }
 
@@ -783,11 +794,11 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
       });
 
       if (result) {
-        addNotification('success', `Dataset "${result.name}" uploaded successfully with ${result.recordCount} records`);
+        addNotification({ type: 'success', title: 'Upload Complete', message: `Dataset "${result.name}" uploaded successfully with ${result.recordCount} records` });
         onSuccess();
       }
     } catch (err) {
-      addNotification('error', err instanceof Error ? err.message : 'Failed to upload dataset');
+      addNotification({ type: 'error', title: 'Upload Failed', message: err instanceof Error ? err.message : 'Failed to upload dataset' });
     }
   };
 

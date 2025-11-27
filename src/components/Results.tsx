@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Download, FileText, Table, FileJson, RefreshCw, AlertCircle, ArrowLeft, ChevronRight, Calendar, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { simulationService } from '@/services';
 import { useAppContext } from '@/contexts/AppContext';
+import { Pagination } from '@/components/ui/Pagination';
 import type { SimulationResponse, ScenarioResultDto, SimulationStatus } from '@/types/api.types';
 
 interface ResultsProps {
@@ -48,10 +49,11 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | SimulationStatus>('all');
   const [scenarioStatusFilter, setScenarioStatusFilter] = useState<'all' | 'PASSED' | 'FAILED' | 'ERROR'>('all');
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
+  // Pagination (0-based page index)
+  const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 10;
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   // Load simulations list
   const loadSimulations = useCallback(async () => {
@@ -63,13 +65,14 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
       // API returns array directly, not paginated response - handle pagination client-side
       const allSimulations = await simulationService.getAll(filters);
 
-      // Client-side pagination
-      const startIndex = (currentPage - 1) * pageSize;
+      // Client-side pagination (0-based indexing)
+      const startIndex = currentPage * pageSize;
       const endIndex = startIndex + pageSize;
       const paginatedSimulations = allSimulations.slice(startIndex, endIndex);
 
       setSimulations(paginatedSimulations);
       setTotalPages(Math.ceil(allSimulations.length / pageSize) || 1);
+      setTotalItems(allSimulations.length);
     } catch (e) {
       addNotification({
         type: 'error',
@@ -80,7 +83,19 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
     } finally {
       setLoadingList(false);
     }
-  }, [currentPage, statusFilter, addNotification]);
+  }, [currentPage, pageSize, statusFilter, addNotification]);
+
+  // Pagination handlers
+  const handlePageChange = useCallback((page: number) => {
+    if (page >= 0 && page < totalPages) {
+      setCurrentPage(page);
+    }
+  }, [totalPages]);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setCurrentPage(0); // Reset to first page
+  }, []);
 
   // Load simulation details
   const loadSimulationDetails = useCallback(async (id: string) => {
@@ -109,10 +124,10 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
   }, [simulationId, loadSimulations, loadSimulationDetails]);
 
   // Filter scenario results
-  const filteredScenarioResults = selectedSimulation?.results?.filter(result => {
+  const filteredScenarioResults = selectedSimulation?.scenarioExecutions?.filter(result => {
     const matchesSearch = result.scenarioName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       result.scenarioId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = scenarioStatusFilter === 'all' || result.status === scenarioStatusFilter;
+    const matchesStatus = scenarioStatusFilter === 'all' || result.success === (scenarioStatusFilter === 'PASSED');
     return matchesSearch && matchesStatus;
   }) || [];
 
@@ -121,9 +136,9 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
     if (!selectedSimulation) return;
 
     const headers = ['Scenario Name', 'Status', 'Duration (ms)', 'Rules Fired', 'Error'];
-    const rows = selectedSimulation.results?.map(r => [
+    const rows = selectedSimulation.scenarioExecutions?.map(r => [
       r.scenarioName || r.scenarioId,
-      r.status,
+      r.success ? 'PASSED' : 'FAILED',
       r.executionTimeMs?.toString() || '',
       r.rulesFired?.join('; ') || '',
       r.errorMessage || '',
@@ -309,9 +324,9 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
 
   // Simulation details view
   if (selectedSimulation) {
-    const passed = selectedSimulation.results?.filter(r => r.status === 'PASSED').length || 0;
-    const failed = selectedSimulation.results?.filter(r => r.status === 'FAILED').length || 0;
-    const errors = selectedSimulation.results?.filter(r => r.status === 'ERROR').length || 0;
+    const passed = selectedSimulation.scenarioExecutions?.filter(r => r.success === true).length || 0;
+    const failed = selectedSimulation.scenarioExecutions?.filter(r => r.success === false).length || 0;
+    const errors = 0; // No separate error status in scenarioExecutions, failures are marked with success=false
     const totalDuration = selectedSimulation.metrics?.totalDurationMs || 0;
 
     return (
@@ -372,7 +387,9 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
             <div className="h-6 w-px bg-[#87C1F1]"></div>
             <div className="flex items-center gap-2">
               <span style={{ fontSize: '16px', fontWeight: 600 }}>
-                {selectedSimulation.metrics?.successRate?.toFixed(1) || 0}% Pass Rate
+                {selectedSimulation.metrics?.successRate !== undefined && selectedSimulation.metrics?.successRate !== null
+                  ? `${selectedSimulation.metrics.successRate.toFixed(1)}% Pass Rate`
+                  : '- Pass Rate'}
               </span>
             </div>
           </div>
@@ -613,7 +630,9 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
                         </span>
                       </td>
                       <td className="p-4" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                        {sim.metrics?.successRate?.toFixed(1) || 0}%
+                        {sim.metrics?.successRate !== undefined && sim.metrics?.successRate !== null
+                          ? `${sim.metrics.successRate.toFixed(1)}%`
+                          : '-'}
                       </td>
                       <td className="p-4" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
                         {sim.metrics?.totalDurationMs ? formatDuration(sim.metrics.totalDurationMs) : '-'}
@@ -632,27 +651,20 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
         )}
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 p-4 border-t" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 rounded hover:bg-[var(--color-background)] transition-colors disabled:opacity-50"
-              style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}
-            >
-              Previous
-            </button>
-            <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 rounded hover:bg-[var(--color-background)] transition-colors disabled:opacity-50"
-              style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}
-            >
-              Next
-            </button>
+        {totalItems > 0 && (
+          <div className="p-4 border-t" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalElements={totalItems}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              pageSizeOptions={[5, 10, 20, 50]}
+              showPageSizeSelector={true}
+              showPageInfo={true}
+              showFirstLast={true}
+            />
           </div>
         )}
       </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Save, User, Bell, Lock, Database, Palette, Server, RefreshCw, CheckCircle, XCircle, AlertCircle, Download, Upload, RotateCcw } from 'lucide-react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useAppContext } from '@/contexts/AppContext';
+import { useTheme, Theme } from '@/contexts/ThemeContext';
 import { apiService } from '@/services/api.service';
 import type { AppSettings, ExecutionMode } from '@/types/api.types';
 
@@ -12,6 +13,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultRuleSet: undefined,
   defaultPageSize: 10,
   autoRefreshInterval: 30000,
+  autoSaveInterval: 30000,
   theme: 'light',
   defaultExecutionMode: 'SEQUENTIAL',
   scenarioTimeoutSeconds: 60,
@@ -29,6 +31,7 @@ export function Settings() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const { addNotification } = useAppContext();
+  const { theme, setTheme } = useTheme();
 
   // Form state
   const [formData, setFormData] = useState<AppSettings>(settings);
@@ -46,7 +49,7 @@ export function Settings() {
   // Save settings
   const handleSave = () => {
     setSettings(formData);
-    addNotification('success', 'Settings saved successfully');
+    addNotification({ type: 'success', title: 'Settings Saved', message: 'Settings saved successfully' });
     setHasChanges(false);
   };
 
@@ -54,7 +57,7 @@ export function Settings() {
   const handleReset = () => {
     setFormData(DEFAULT_SETTINGS);
     setSettings(DEFAULT_SETTINGS);
-    addNotification('info', 'Settings reset to defaults');
+    addNotification({ type: 'info', title: 'Settings Reset', message: 'Settings reset to defaults' });
     setHasChanges(false);
   };
 
@@ -76,7 +79,7 @@ export function Settings() {
         const data = await response.json();
         if (data.status === 'UP') {
           setApiStatus('success');
-          addNotification('success', 'SimRule API is healthy and connected');
+          addNotification({ type: 'success', title: 'Connection Successful', message: 'SimRule API is healthy and connected' });
         } else {
           setApiStatus('error');
           setApiError(`API status: ${data.status}`);
@@ -103,7 +106,7 @@ export function Settings() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    addNotification('success', 'Settings exported');
+    addNotification({ type: 'success', title: 'Export Complete', message: 'Settings exported successfully' });
   };
 
   // Import settings
@@ -118,9 +121,9 @@ export function Settings() {
         const merged = { ...DEFAULT_SETTINGS, ...imported };
         setFormData(merged);
         setSettings(merged);
-        addNotification('success', 'Settings imported successfully');
+        addNotification({ type: 'success', title: 'Import Complete', message: 'Settings imported successfully' });
       } catch (err) {
-        addNotification('error', 'Invalid settings file');
+        addNotification({ type: 'error', title: 'Import Failed', message: 'Invalid settings file' });
       }
     };
     reader.readAsText(file);
@@ -371,7 +374,7 @@ export function Settings() {
 
                 <div>
                   <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
-                    Auto-Refresh Interval (ms)
+                    Auto-Refresh Interval
                   </label>
                   <select
                     value={formData.autoRefreshInterval}
@@ -390,6 +393,27 @@ export function Settings() {
                     How often the dashboard automatically refreshes data
                   </p>
                 </div>
+
+                <div>
+                  <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
+                    Auto-Save Interval (Scenario Editor)
+                  </label>
+                  <select
+                    value={formData.autoSaveInterval}
+                    onChange={(e) => updateField('autoSaveInterval', parseInt(e.target.value))}
+                    className="w-full px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+                    style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
+                  >
+                    <option value={15000}>15 seconds</option>
+                    <option value={30000}>30 seconds</option>
+                    <option value={60000}>1 minute</option>
+                    <option value={120000}>2 minutes</option>
+                    <option value={0}>Disabled</option>
+                  </select>
+                  <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                    How often scenario editor drafts are auto-saved to browser storage. Auto-saved data can be recovered if browser closes unexpectedly.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -404,15 +428,18 @@ export function Settings() {
                     Theme
                   </label>
                   <select
-                    value={formData.theme}
-                    onChange={(e) => updateField('theme', e.target.value as 'light' | 'dark' | 'auto')}
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value as Theme)}
                     className="w-full px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
                     style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
                   >
                     <option value="light">Light Mode</option>
-                    <option value="dark">Dark Mode (Coming Soon)</option>
+                    <option value="dark">Dark Mode</option>
                     <option value="auto">Auto (System Default)</option>
                   </select>
+                  <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                    {theme === 'auto' ? 'Theme will follow your system preference' : `Using ${theme} theme`}
+                  </p>
                 </div>
 
                 <div>

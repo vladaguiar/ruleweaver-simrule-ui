@@ -10,6 +10,8 @@ import { Coverage } from "./components/Coverage";
 import { Datasets } from "./components/Datasets";
 import { Settings } from "./components/Settings";
 import { ScenarioEditor } from "./components/ScenarioEditor";
+import { NotificationContainer } from "./components/ui/NotificationToast";
+import { DatasetEditor } from "./components/DatasetEditor";
 
 // Page state type for better type safety
 type PageType =
@@ -20,6 +22,7 @@ type PageType =
   | 'results'
   | 'coverage'
   | 'datasets'
+  | 'dataset-editor'
   | 'settings';
 
 interface PageState {
@@ -27,6 +30,7 @@ interface PageState {
   params?: {
     scenarioId?: string;
     simulationId?: string;
+    datasetId?: string;
   };
 }
 
@@ -60,6 +64,13 @@ export default function App() {
         return <Coverage onNavigate={navigate} />;
       case "datasets":
         return <Datasets onNavigate={navigate} />;
+      case "dataset-editor":
+        return (
+          <DatasetEditor
+            datasetId={pageState.params?.datasetId}
+            onNavigate={navigate}
+          />
+        );
       case "settings":
         return <Settings />;
       default:
@@ -78,6 +89,7 @@ export default function App() {
             {renderPage()}
           </ErrorBoundary>
         </Layout>
+        <NotificationContainer />
       </AppProvider>
     </ErrorBoundary>
   );
