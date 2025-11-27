@@ -8,6 +8,7 @@ import { simulationService, scenarioService } from '@/services';
 import { websocketService, type WebSocketStatus, type SimulationWebSocket } from '@/services/websocket.service';
 import { useAppContext } from '@/contexts/AppContext';
 import type { ScenarioResponse, SimulationResponse, ExecutionMode, SimulationWebSocketMessage } from '@/types/api.types';
+import { logger } from '@/utils/logger';
 
 interface SimulationRunnerProps {
   onNavigate: (page: string, params?: { scenarioId?: string; simulationId?: string }) => void;
@@ -228,6 +229,25 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
       startTimer();
 
       const name = simulationName || `Simulation - ${new Date().toLocaleString()}`;
+
+      // Log user-selected settings
+      logger.group('Simulation Execution Request', () => {
+        logger.info('SimulationRunner', 'User Settings', {
+          simulationName: name,
+          selectedScenarios: selectedScenarios.length,
+          executionMode,
+          concurrency,
+          timeoutSeconds: timeout,
+        });
+
+        logger.debug('SimulationRunner', 'Calling service with config', {
+          name,
+          executionMode,
+          concurrency,
+          timeoutSeconds: timeout,
+        });
+      });
+
       const response = await simulationService.executeScenarios(
         selectedScenarios,
         {
@@ -241,6 +261,13 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
       setSimulation(response);
       // Store simulation ID in ref for cleanup
       simulationIdRef.current = response.id;
+
+      // Log successful response
+      logger.info('SimulationRunner', 'Simulation started successfully', {
+        simulationId: response.id,
+        status: response.status,
+        correlationId: response.correlationId,
+      });
 
       // Connect WebSocket for real-time updates
       wsConnectionRef.current = websocketService.connectToSimulation(response.id, {
@@ -298,6 +325,16 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
     } catch (e) {
       setIsRunning(false);
       stopTimer();
+
+      // Log error with full context
+      logger.error('SimulationRunner', 'Failed to start simulation', {
+        error: e,
+        selectedScenarios: selectedScenarios.length,
+        executionMode,
+        concurrency,
+        timeout,
+      });
+
       addNotification({
         type: 'error',
         title: 'Simulation Failed',
