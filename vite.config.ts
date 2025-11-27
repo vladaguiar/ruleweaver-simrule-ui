@@ -5,6 +5,10 @@
 
   export default defineConfig({
     plugins: [react()],
+    define: {
+      // SockJS needs global to be defined
+      global: 'globalThis',
+    },
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
