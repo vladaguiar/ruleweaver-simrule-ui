@@ -16,7 +16,7 @@ const getEnvVar = (key: keyof ImportMetaEnv, defaultValue: string): string => {
 // Development configuration
 const developmentConfig: ApiConfig = {
   baseUrl: 'http://localhost:8081/api/v1',
-  wsBaseUrl: 'ws://localhost:8081/ws',
+  wsBaseUrl: 'http://localhost:8081/api', // WebSocket base URL (converted to ws://localhost:8081/api)
   timeout: 10000,
   retryAttempts: 3,
   retryDelay: 1000,
@@ -25,7 +25,7 @@ const developmentConfig: ApiConfig = {
 // Production configuration
 const productionConfig: ApiConfig = {
   baseUrl: getEnvVar('VITE_API_BASE_URL', 'https://simrule-api.example.com/api/v1'),
-  wsBaseUrl: getEnvVar('VITE_WS_BASE_URL', 'wss://simrule-api.example.com/ws'),
+  wsBaseUrl: getEnvVar('VITE_WS_BASE_URL', 'https://simrule-api.example.com/api'), // WebSocket base URL
   timeout: 30000,
   retryAttempts: 3,
   retryDelay: 2000,
@@ -34,7 +34,7 @@ const productionConfig: ApiConfig = {
 // Docker configuration
 const dockerConfig: ApiConfig = {
   baseUrl: 'http://simrule-api:8081/api/v1',
-  wsBaseUrl: 'ws://simrule-api:8081/ws',
+  wsBaseUrl: 'http://simrule-api:8081/api', // WebSocket base URL
   timeout: 15000,
   retryAttempts: 3,
   retryDelay: 1000,
@@ -97,6 +97,7 @@ export const API_ENDPOINTS = {
 
   // Rule Sets
   RULE_SETS: '/rules/sets',
+  RULES: '/rules',
 
   // Health - actuator is under /api not /api/v1
   HEALTH: '/actuator/health',
@@ -112,7 +113,8 @@ export const getActuatorBaseUrl = (): string => {
 
 // WebSocket Endpoints
 export const WS_ENDPOINTS = {
-  SIMULATION: (simulationId: string) => `/simulations/${simulationId}`,
+  // WebSocket endpoint - connects to general WS, simulation ID sent in subscription
+  WS: '/ws',
 } as const;
 
 // Request Headers

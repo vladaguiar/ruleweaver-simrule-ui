@@ -540,3 +540,18 @@ export interface RuleSetsResponse {
   size: number;
   hasMore: boolean;
 }
+
+export interface RuleInfo {
+  ruleId: string;
+  ruleName: string;
+  ruleSet: string;
+  agendaGroup?: string;
+  salience?: number;
+  enabled: boolean;
+  version?: number;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  lastModifiedBy?: string;
+  lastModifiedAt?: string;
+}

@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Save, X, Play, ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Clock, Keyboard, Wand2 } from 'lucide-react';
 import { useScenario } from '@/hooks/useScenarios';
 import { useRuleSets } from '@/hooks/useRuleSets';
+import { useSchemas } from '@/hooks/useSchemas';
 import { scenarioService, simulationService, schemaService, type ValidationError } from '@/services';
 import { MonacoJsonEditor } from '@/components/ui/MonacoJsonEditor';
+import { RuleMultiSelect } from '@/components/ui/RuleMultiSelect';
 import type { FactTypeSchema } from '@/types/api.types';
 import { useAppContext } from '@/contexts/AppContext';
 import { useKeyboardShortcuts, formatShortcut } from '@/hooks/useKeyboardShortcuts';
@@ -66,7 +68,6 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [expectedRulesFired, setExpectedRulesFired] = useState<string[]>([]);
-  const [ruleInput, setRuleInput] = useState('');
   const [expectedValidationPassed, setExpectedValidationPassed] = useState(true);
   const [assertions, setAssertions] = useState<AssertionDto[]>([]);
 
@@ -95,6 +96,12 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
 
   // Available rule sets from Rule Inspector API
   const { ruleSetIds: availableRuleSets, loading: ruleSetsLoading } = useRuleSets();
+
+  // Available schemas from Rule Inspector API
+  const { schemas, factTypes, loading: schemasLoading, error: schemasError, getRuleSetsForFactType } = useSchemas();
+
+  // Filtered rule sets based on selected fact type
+  const [filteredRuleSets, setFilteredRuleSets] = useState<string[]>([]);
 
   // Get auto-save key for current scenario
   const autoSaveKey = useMemo(() => {
@@ -338,6 +345,40 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
     };
   }, [factType, testDataJson]);
 
+  // Filter rule sets based on selected fact type
+  useEffect(() => {
+    if (!factType.trim()) {
+      // No fact type selected: show all rule sets
+      setFilteredRuleSets(availableRuleSets);
+      return;
+    }
+
+    // Get associated rule sets for the selected fact type
+    const associatedRuleSets = getRuleSetsForFactType(factType);
+
+    if (associatedRuleSets.length === 0) {
+      // No associations defined: show all rule sets (graceful degradation)
+      setFilteredRuleSets(availableRuleSets);
+    } else {
+      // Filter to only show associated rule sets that exist
+      const filtered = availableRuleSets.filter(rs => associatedRuleSets.includes(rs));
+      setFilteredRuleSets(filtered);
+    }
+  }, [factType, schemas, availableRuleSets, getRuleSetsForFactType]);
+
+  // Clear rule set if it becomes invalid for the selected fact type
+  useEffect(() => {
+    if (ruleSet && filteredRuleSets.length > 0 && !filteredRuleSets.includes(ruleSet)) {
+      // Current rule set is not compatible with selected fact type
+      setRuleSet('');
+    }
+  }, [filteredRuleSets, ruleSet]);
+
+  // Clear expected rules when rule set changes
+  useEffect(() => {
+    setExpectedRulesFired([]);
+  }, [ruleSet]);
+
   // Validate test data against schema when JSON changes
   const validateAgainstSchema = useCallback((json: string) => {
     if (!schema || !json) {
@@ -367,8 +408,8 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
 
     try {
       const sampleResponse = await schemaService.getSampleData(factType);
-      if (sampleResponse?.sample) {
-        const formattedJson = JSON.stringify(sampleResponse.sample, null, 2);
+      if (sampleResponse?.sampleData) {
+        const formattedJson = JSON.stringify(sampleResponse.sampleData, null, 2);
         setTestDataJson(formattedJson);
         validateAgainstSchema(formattedJson);
         setSuccess('Sample data generated successfully');
@@ -537,13 +578,6 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
   };
 
   // Rule management
-  const addRule = () => {
-    if (ruleInput.trim() && !expectedRulesFired.includes(ruleInput.trim())) {
-      setExpectedRulesFired([...expectedRulesFired, ruleInput.trim()]);
-      setRuleInput('');
-    }
-  };
-
   const removeRule = (rule: string) => {
     setExpectedRulesFired(expectedRulesFired.filter((r) => r !== rule));
   };
@@ -843,6 +877,47 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
                 />
               </div>
 
+              {/* Fact Type Field - NOW FIRST */}
+              <div>
+                <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
+                  Fact Type <span style={{ color: 'var(--color-error)' }}>*</span>
+                </label>
+                <select
+                  value={factType}
+                  onChange={(e) => setFactType(e.target.value)}
+                  className="w-full px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+                  style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
+                  disabled={schemasLoading}
+                >
+                  <option value="">Select a fact type</option>
+                  {factType && !factTypes.includes(factType) && (
+                    <option key={factType} value={factType}>
+                      {factType} (Not in schema registry)
+                    </option>
+                  )}
+                  {factTypes.map((ft) => {
+                    const schema = schemas.find(s => s.factType === ft);
+                    const displayLabel = schema?.displayName || ft;
+                    return (
+                      <option key={ft} value={ft}>
+                        {displayLabel}
+                      </option>
+                    );
+                  })}
+                </select>
+                {schemasLoading && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Loading fact types...
+                  </p>
+                )}
+                {schemasError && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>
+                    Failed to load fact types: {schemasError}
+                  </p>
+                )}
+              </div>
+
+              {/* Rule Set Field - NOW SECOND */}
               <div>
                 <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
                   Rule Set <span style={{ color: 'var(--color-error)' }}>*</span>
@@ -852,26 +927,23 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
                   onChange={(e) => setRuleSet(e.target.value)}
                   className="w-full px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
                   style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
+                  disabled={ruleSetsLoading || !factType}
                 >
                   <option value="">Select a rule set</option>
-                  {availableRuleSets.map((rs) => (
+                  {filteredRuleSets.map((rs) => (
                     <option key={rs} value={rs}>{rs}</option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
-                  Fact Type <span style={{ color: 'var(--color-error)' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={factType}
-                  onChange={(e) => setFactType(e.target.value)}
-                  placeholder="e.g., Customer, Order, Payment"
-                  className="w-full px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
-                  style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
-                />
+                {!factType && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    Select a fact type first to see compatible rule sets
+                  </p>
+                )}
+                {factType && filteredRuleSets.length === 0 && !ruleSetsLoading && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    All rule sets available (no specific associations defined)
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1053,38 +1125,44 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
                 <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
                   Expected Rules to Fire
                 </label>
-                <div className="flex gap-2 mb-2 flex-wrap">
-                  {expectedRulesFired.map((rule) => (
-                    <span
-                      key={rule}
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full"
-                      style={{ backgroundColor: '#E3F2FD', color: 'var(--color-primary)', fontSize: '12px' }}
-                    >
-                      {rule}
-                      <button onClick={() => removeRule(rule)}>
-                        <X size={14} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={ruleInput}
-                    onChange={(e) => setRuleInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addRule())}
-                    placeholder="Enter rule name"
-                    className="flex-1 px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
-                    style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
-                  />
-                  <button
-                    onClick={addRule}
-                    className="px-4 py-2 border rounded hover:bg-[var(--color-surface)] transition-colors"
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    <Plus size={18} />
-                  </button>
-                </div>
+
+                {/* Multi-select dropdown */}
+                <RuleMultiSelect
+                  ruleSet={ruleSet}
+                  value={expectedRulesFired}
+                  onChange={setExpectedRulesFired}
+                  disabled={!ruleSet}
+                  placeholder="Select expected rules..."
+                />
+
+                {/* Selected rules display (chips/tags) */}
+                {expectedRulesFired.length > 0 && (
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    {expectedRulesFired.map((rule) => (
+                      <span
+                        key={rule}
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full"
+                        style={{ backgroundColor: '#E3F2FD', color: 'var(--color-primary)', fontSize: '12px' }}
+                      >
+                        {rule}
+                        <button
+                          onClick={() => removeRule(rule)}
+                          className="hover:opacity-70 transition-opacity"
+                          aria-label={`Remove ${rule}`}
+                        >
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Helper text when no rule set selected */}
+                {!ruleSet && (
+                  <p className="text-xs mt-2" style={{ color: 'var(--color-text-muted)' }}>
+                    Select a rule set first to choose expected rules
+                  </p>
+                )}
               </div>
             </div>
           )}
