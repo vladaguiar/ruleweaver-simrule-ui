@@ -820,7 +820,7 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
       )}
 
       {/* Tabs */}
-      <div className="bg-[var(--color-background)] rounded-lg overflow-hidden" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
+      <div className="bg-[var(--color-background)] rounded-lg overflow-visible" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
         <div className="flex border-b" style={{ borderColor: 'var(--color-border)' }}>
           {[
             { id: 'metadata', label: 'Metadata' },
