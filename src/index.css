@@ -1213,23 +1213,55 @@
   --radius-full: 50%;
 }
 
-.dark {
-  --color-background: #1f2937;
-  --color-surface: #374151;
-  --color-surface-dark: #2d3748;
-  --color-border: #4b5563;
-  --color-text-primary: #fff;
-  --color-text-secondary: #d1d5db;
-  --color-text-muted: #9ca3af;
+/* Dark theme - activated via data-theme attribute or .dark class */
+.dark,
+[data-theme="dark"] {
+  --color-background: #1a1a2e;
+  --color-surface: #252540;
+  --color-surface-dark: #1f1f35;
+  --color-primary: #5b9bd5;
+  --color-accent: #fd9071;
+  --color-border: #3d3d5c;
+  --color-text-primary: #f7fafc;
+  --color-text-secondary: #cbd5e0;
+  --color-text-muted: #a0aec0;
   --color-text-disabled: #6b7280;
-  --color-table-header: #374151;
-  --color-table-even-row: #2d3748;
-  --color-table-odd-row: #374151;
-  --color-table-hover: #4a5568;
-  --shadow-1: 0 2px 4px #0000004d;
-  --shadow-2: 0 4px 8px #0006;
-  --shadow-3: 0 8px 16px #00000080;
-  --shadow-4: 0 16px 32px #0009;
+  --color-success: #68d391;
+  --color-error: #fc8181;
+  --color-warning: #f6e05e;
+  --color-info: #63b3ed;
+  --color-table-header: #252540;
+  --color-table-even-row: #1f1f35;
+  --color-table-odd-row: #252540;
+  --color-table-hover: #3d3d5c;
+  --shadow-1: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 8px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 8px 16px rgba(0, 0, 0, 0.6);
+  --shadow-4: 0 16px 32px rgba(0, 0, 0, 0.7);
+}
+
+/* System preference auto mode */
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] {
+    --color-background: #1a1a2e;
+    --color-surface: #252540;
+    --color-surface-dark: #1f1f35;
+    --color-primary: #5b9bd5;
+    --color-accent: #fd9071;
+    --color-border: #3d3d5c;
+    --color-text-primary: #f7fafc;
+    --color-text-secondary: #cbd5e0;
+    --color-text-muted: #a0aec0;
+    --color-text-disabled: #6b7280;
+    --color-success: #68d391;
+    --color-error: #fc8181;
+    --color-warning: #f6e05e;
+    --color-info: #63b3ed;
+    --shadow-1: 0 2px 4px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 4px 8px rgba(0, 0, 0, 0.5);
+    --shadow-3: 0 8px 16px rgba(0, 0, 0, 0.6);
+    --shadow-4: 0 16px 32px rgba(0, 0, 0, 0.7);
+  }
 }
 
 * {
@@ -1445,4 +1477,39 @@ code, pre {
   syntax: "*";
   inherits: false;
   initial-value: "";
+}
+
+/* Notification animations */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out forwards;
+}
+
+/* Spin animation for loaders */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Smooth theme transition */
+*, *::before, *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
 }
