@@ -3,7 +3,7 @@ import { Search, Download, FileText, Table, FileJson, RefreshCw, AlertCircle, Ar
 import { simulationService } from '@/services';
 import { useAppContext } from '@/contexts/AppContext';
 import { Pagination } from '@/components/ui/Pagination';
-import type { SimulationResponse, ScenarioResultDto, SimulationStatus } from '@/types/api.types';
+import type { SimulationResponse, ScenarioExecutionDto, SimulationStatus } from '@/types/api.types';
 
 interface ResultsProps {
   simulationId?: string;
@@ -41,7 +41,7 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
 
   // State for selected simulation details
   const [selectedSimulation, setSelectedSimulation] = useState<SimulationResponse | null>(null);
-  const [selectedScenarioResult, setSelectedScenarioResult] = useState<ScenarioResultDto | null>(null);
+  const [selectedScenarioResult, setSelectedScenarioResult] = useState<ScenarioExecutionDto | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Filter state
@@ -127,7 +127,9 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
   const filteredScenarioResults = selectedSimulation?.scenarioExecutions?.filter(result => {
     const matchesSearch = result.scenarioName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       result.scenarioId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = scenarioStatusFilter === 'all' || result.success === (scenarioStatusFilter === 'PASSED');
+    const matchesStatus = scenarioStatusFilter === 'all' ||
+      (scenarioStatusFilter === 'PASSED' && result.success === true) ||
+      (scenarioStatusFilter === 'FAILED' && result.success === false);
     return matchesSearch && matchesStatus;
   }) || [];
 
@@ -139,7 +141,7 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
     const rows = selectedSimulation.scenarioExecutions?.map(r => [
       r.scenarioName || r.scenarioId,
       r.success ? 'PASSED' : 'FAILED',
-      r.executionTimeMs?.toString() || '',
+      r.durationMs?.toString() || '',
       r.rulesFired?.join('; ') || '',
       r.errorMessage || '',
     ]) || [];
@@ -199,26 +201,32 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
             <div>
               <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>Duration:</span>
               <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                {selectedScenarioResult.executionTimeMs ? formatDuration(selectedScenarioResult.executionTimeMs) : '-'}
+                {selectedScenarioResult.durationMs ? formatDuration(selectedScenarioResult.durationMs) : '-'}
               </p>
             </div>
             <div>
               <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>Status:</span>
               <p>
-                <span
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full"
-                  style={{
-                    backgroundColor: selectedScenarioResult.status === 'PASSED' ? '#C3E770' :
-                      selectedScenarioResult.status === 'FAILED' ? '#EF6F53' : '#F7EA73',
-                    color: selectedScenarioResult.status === 'PASSED' ? '#1B5E20' :
-                      selectedScenarioResult.status === 'FAILED' ? '#FFFFFF' : '#5D4037',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                  }}
-                >
-                  {selectedScenarioResult.status === 'PASSED' ? '✅' : selectedScenarioResult.status === 'FAILED' ? '❌' : '⚠️'}
-                  {selectedScenarioResult.status}
-                </span>
+                {(() => {
+                  const status = selectedScenarioResult.success ? 'PASSED' : 'FAILED';
+                  const bgColor = status === 'PASSED' ? '#C3E770' : '#EF6F53';
+                  const textColor = status === 'PASSED' ? '#1B5E20' : '#FFFFFF';
+                  const icon = status === 'PASSED' ? '✅' : '❌';
+
+                  return (
+                    <span
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full"
+                      style={{
+                        backgroundColor: bgColor,
+                        color: textColor,
+                        fontSize: '12px',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {icon} {status}
+                    </span>
+                  );
+                })()}
               </p>
             </div>
             <div>
@@ -452,23 +460,29 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
                           {result.scenarioName || result.scenarioId}
                         </td>
                         <td className="p-4">
-                          <span
-                            className="inline-flex items-center gap-1 px-3 py-1 rounded-full"
-                            style={{
-                              backgroundColor: result.status === 'PASSED' ? '#C3E770' :
-                                result.status === 'FAILED' ? '#EF6F53' : '#F7EA73',
-                              color: result.status === 'PASSED' ? '#1B5E20' :
-                                result.status === 'FAILED' ? '#FFFFFF' : '#5D4037',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                            }}
-                          >
-                            {result.status === 'PASSED' ? '✅' : result.status === 'FAILED' ? '❌' : '⚠️'}
-                            {result.status}
-                          </span>
+                          {(() => {
+                            const status = result.success ? 'PASSED' : 'FAILED';
+                            const bgColor = status === 'PASSED' ? '#C3E770' : '#EF6F53';
+                            const textColor = status === 'PASSED' ? '#1B5E20' : '#FFFFFF';
+                            const icon = status === 'PASSED' ? '✅' : '❌';
+
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 px-3 py-1 rounded-full"
+                                style={{
+                                  backgroundColor: bgColor,
+                                  color: textColor,
+                                  fontSize: '12px',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {icon} {status}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="p-4" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
-                          {result.executionTimeMs ? formatDuration(result.executionTimeMs) : '-'}
+                          {result.durationMs ? formatDuration(result.durationMs) : '-'}
                         </td>
                         <td className="p-4" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-primary)' }}>
                           {result.rulesFired?.length || 0}
