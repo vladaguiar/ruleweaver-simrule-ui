@@ -283,24 +283,16 @@ export interface DatasetFilters {
 // ============================================
 
 export interface RuleCoverageDto {
+  ruleId: string;  // NEW: Direct field (was in metadata)
   ruleName: string;
-  ruleDescription?: string;
+  ruleDescription: string | null;
+  covered: boolean;  // NEW: Indicates if rule is tested
   executionCount: number;
-  lastExecutedAt?: string;
-  scenarioIds?: string[];
-  successRate?: number;
-  metadata?: Record<string, unknown>;
+  lastExecutedAt: string | null;
+  scenarioIds: string[];
 }
 
-export interface CoverageMetricsDto {
-  totalRules: number;
-  rulesTested: number;
-  rulesUntested: number;
-  coveragePercentage: number;
-  totalScenarios: number;
-  totalSimulations: number;
-  avgRuleExecutions?: number;
-}
+// CoverageMetricsDto interface removed - no longer used in v2.0 API
 
 export interface CoverageTrendDto {
   timestamp: string;
@@ -313,14 +305,21 @@ export interface CoverageReportResponse {
   id: string;
   ruleSet: string;
   generatedAt: string;
-  metrics: CoverageMetricsDto;
-  testedRules: RuleCoverageDto[];
-  untestedRules: RuleCoverageDto[];
-  trends?: CoverageTrendDto[];
   generatedBy: string;
-  simulationIds?: string[];
-  periodFrom?: string;
-  periodTo?: string;
+  // All metrics now at root level (flat structure)
+  totalRules: number;  // Was: metrics.totalRules
+  testedRules: number;  // Was: metrics.rulesTested (TYPE CHANGE: array → integer)
+  untestedRules: number;  // Was: metrics.rulesUntested (TYPE CHANGE: array → integer)
+  coveragePercentage: number;  // Was: metrics.coveragePercentage
+  totalScenarios: number;  // Was: metrics.totalScenarios
+  totalSimulations: number;  // Was: metrics.totalSimulations
+  avgRuleExecutions: number;  // Was: metrics.avgRuleExecutions
+  // New combined array replacing separate testedRules/untestedRules arrays
+  ruleCoverage: RuleCoverageDto[];  // NEW: Combined array with covered boolean
+  simulationIds: string[];
+  periodFrom: string;
+  periodTo: string;
+  // Note: trends array removed - use separate trends endpoint
 }
 
 // ============================================

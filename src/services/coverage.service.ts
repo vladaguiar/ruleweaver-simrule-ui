@@ -52,10 +52,10 @@ class CoverageService {
           const report = await this.getLatest(ruleSet, options);
           return {
             ruleSet,
-            coveragePercentage: report.metrics.coveragePercentage,
-            totalRules: report.metrics.totalRules,
-            testedRules: report.metrics.rulesTested,
-            untestedRules: report.metrics.rulesUntested,
+            coveragePercentage: report.coveragePercentage,
+            totalRules: report.totalRules,
+            testedRules: report.testedRules,
+            untestedRules: report.untestedRules,
           };
         } catch (err) {
           // Log error and return with error indicator instead of silently failing

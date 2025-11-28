@@ -105,9 +105,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           // Calculate totals across all rule sets
           const totals = validReports.reduce(
             (acc, report) => ({
-              covered: acc.covered + report.metrics.rulesTested,
-              untested: acc.untested + report.metrics.rulesUntested,
-              total: acc.total + report.metrics.totalRules,
+              covered: acc.covered + report.testedRules,
+              untested: acc.untested + report.untestedRules,
+              total: acc.total + report.totalRules,
             }),
             { covered: 0, untested: 0, total: 0 }
           );
