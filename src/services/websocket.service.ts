@@ -68,7 +68,19 @@ class SimulationWebSocket {
       this.ws.onmessage = (event) => {
         try {
           console.log('[WebSocket] Received message:', event.data);
-          const message = JSON.parse(event.data) as SimulationWebSocketMessage;
+          const raw = JSON.parse(event.data);
+
+          // Transform eventType → type to match frontend interface
+          const message = {
+            ...raw,
+            type: raw.eventType || raw.type
+          } as SimulationWebSocketMessage;
+
+          // Remove eventType to avoid confusion
+          if (message.eventType) {
+            delete (message as any).eventType;
+          }
+
           console.log('[WebSocket] Parsed message:', message);
           this.callbacks.onMessage(message);
         } catch (error) {
