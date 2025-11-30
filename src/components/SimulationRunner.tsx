@@ -471,7 +471,10 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progressPercent = totalScenarios > 0 ? (completedScenarios / totalScenarios) * 100 : 0;
+  // FIX: Use backend progress percentage directly instead of calculating from scenario counts
+  // This ensures progress bar updates correctly for fast simulations (<200ms)
+  // Backend sends accurate percentage in WebSocket PROGRESS messages
+  const progressPercent = progress;
 
   const pieData = [
     { name: 'Pass', value: results.pass, color: '#C3E770' },
