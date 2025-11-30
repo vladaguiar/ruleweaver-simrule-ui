@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Download, FileText, Table, FileJson, RefreshCw, AlertCircle, ArrowLeft, ChevronRight, Calendar, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Search, Download, FileText, Table, FileJson, RefreshCw, AlertCircle, ArrowLeft, ChevronRight, Calendar, Clock, CheckCircle, XCircle, AlertTriangle, Database } from 'lucide-react';
 import { simulationService } from '@/services';
 import { useAppContext } from '@/contexts/AppContext';
 import { Pagination } from '@/components/ui/Pagination';
+import { RecordResultsTable } from '@/components/RecordResultsTable';
 import type { SimulationResponse, ScenarioExecutionDto, SimulationStatus } from '@/types/api.types';
 
 interface ResultsProps {
@@ -190,7 +191,18 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
 
         {/* Execution Details */}
         <div className="bg-[var(--color-background)] rounded-lg p-6" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
-          <h3 className="mb-4">Execution Details</h3>
+          <div className="flex items-center gap-2 mb-4">
+            <h3>Execution Details</h3>
+            {selectedScenarioResult.dataDriven && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
+                style={{ fontSize: '10px', backgroundColor: '#E3F2FD', color: 'var(--color-primary)' }}
+              >
+                <Database size={12} />
+                Data-Driven
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>Scenario ID:</span>
@@ -230,9 +242,13 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
               </p>
             </div>
             <div>
-              <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>Validation Result:</span>
+              <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+                {selectedScenarioResult.dataDriven ? 'Records Passed:' : 'Validation Result:'}
+              </span>
               <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                {selectedScenarioResult.validationPassed ? 'Valid' : 'Invalid'}
+                {selectedScenarioResult.dataDriven
+                  ? `${selectedScenarioResult.recordsPassed || 0} / ${selectedScenarioResult.totalRecords || 0}`
+                  : (selectedScenarioResult.validationPassed ? 'Valid' : 'Invalid')}
               </p>
             </div>
           </div>
@@ -270,8 +286,30 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
           </div>
         )}
 
-        {/* Assertion Results */}
-        {selectedScenarioResult.assertionResults && selectedScenarioResult.assertionResults.length > 0 && (
+        {/* Data-Driven Results - Per-Record Execution */}
+        {selectedScenarioResult.dataDriven && selectedScenarioResult.recordExecutions && selectedScenarioResult.recordExecutions.length > 0 && (
+          <div className="bg-[var(--color-background)] rounded-lg p-6" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <Database size={20} style={{ color: 'var(--color-primary)' }} />
+              <h3>Per-Record Execution Results</h3>
+              <span
+                className="px-2 py-0.5 rounded-full"
+                style={{ fontSize: '10px', backgroundColor: '#E3F2FD', color: 'var(--color-primary)' }}
+              >
+                Data-Driven
+              </span>
+            </div>
+            <RecordResultsTable
+              results={selectedScenarioResult.recordExecutions}
+              totalRecords={selectedScenarioResult.totalRecords || 0}
+              recordsPassed={selectedScenarioResult.recordsPassed || 0}
+              recordsFailed={selectedScenarioResult.recordsFailed || 0}
+            />
+          </div>
+        )}
+
+        {/* Assertion Results (for non-data-driven scenarios) */}
+        {selectedScenarioResult.assertionResults && selectedScenarioResult.assertionResults.length > 0 && !selectedScenarioResult.dataDriven && (
           <div className="bg-[var(--color-background)] rounded-lg p-6" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
             <h3 className="mb-4">Assertion Results</h3>
             <div className="overflow-x-auto">
@@ -457,7 +495,18 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
                         onClick={() => setSelectedScenarioResult(result)}
                       >
                         <td className="p-4" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
-                          {result.scenarioName || result.scenarioId}
+                          <div className="flex items-center gap-2">
+                            {result.scenarioName || result.scenarioId}
+                            {result.dataDriven && (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full"
+                                style={{ fontSize: '10px', backgroundColor: '#E3F2FD', color: 'var(--color-primary)' }}
+                              >
+                                <Database size={10} />
+                                {result.totalRecords} records
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="p-4">
                           {(() => {

@@ -66,6 +66,13 @@ export interface CreateScenarioRequest {
   assertions?: AssertionDto[];
   tags?: string[];
   datasetId?: string;
+  // Data-driven testing fields
+  /** If true, scenario uses dataset records instead of testData */
+  useDataset?: boolean;
+  /** Maps dataset fields to fact type fields */
+  fieldMappings?: FieldMapping[];
+  /** Dataset field to use as record identifier in results */
+  recordIdentifierField?: string;
 }
 
 export interface UpdateScenarioRequest {
@@ -79,6 +86,13 @@ export interface UpdateScenarioRequest {
   tags?: string[];
   status?: ScenarioStatus;
   datasetId?: string;
+  // Data-driven testing fields
+  /** If true, scenario uses dataset records instead of testData */
+  useDataset?: boolean;
+  /** Maps dataset fields to fact type fields */
+  fieldMappings?: FieldMapping[];
+  /** Dataset field to use as record identifier in results */
+  recordIdentifierField?: string;
 }
 
 export interface ScenarioResponse {
@@ -102,6 +116,17 @@ export interface ScenarioResponse {
   lastModifiedBy: string;
   createdAt: string;
   updatedAt: string;
+  // Data-driven testing fields
+  /** If true, scenario uses dataset records instead of testData */
+  useDataset?: boolean;
+  /** Maps dataset fields to fact type fields */
+  fieldMappings?: FieldMapping[];
+  /** Dataset field to use as record identifier in results */
+  recordIdentifierField?: string;
+  /** Resolved dataset name for display */
+  datasetName?: string;
+  /** Number of records in linked dataset */
+  datasetRecordCount?: number;
 }
 
 export interface ScenarioFilters {
@@ -137,6 +162,19 @@ export interface ScenarioExecutionDto {
   durationMs: number;
   errorMessage?: string;
   rulesFired?: string[];
+  // Data-driven execution fields
+  /** True if this was a data-driven execution */
+  dataDriven?: boolean;
+  /** Dataset ID used for data-driven execution */
+  datasetId?: string;
+  /** Number of records processed */
+  totalRecords?: number;
+  /** Number of records that passed */
+  recordsPassed?: number;
+  /** Number of records that failed */
+  recordsFailed?: number;
+  /** Per-record execution results */
+  recordExecutions?: RecordExecutionResult[];
 }
 
 export interface ExecutionMetricsDto {
@@ -150,6 +188,17 @@ export interface ExecutionMetricsDto {
   assertionsPassed: number;
   assertionsFailed: number;
   assertionSuccessRate: number;
+  // Data-driven metrics
+  /** Count of data-driven scenarios executed */
+  dataDrivenScenarios?: number;
+  /** Total records across all data-driven scenarios */
+  totalRecordsProcessed?: number;
+  /** Records that passed validation */
+  totalRecordsPassed?: number;
+  /** Records that failed validation */
+  totalRecordsFailed?: number;
+  /** Success rate for data-driven records (0.0 - 1.0) */
+  recordSuccessRate?: number;
 }
 
 export interface SimulationResponse {
@@ -553,4 +602,89 @@ export interface RuleInfo {
   updatedAt?: string;
   lastModifiedBy?: string;
   lastModifiedAt?: string;
+}
+
+// ============================================
+// Data-Driven Testing Types
+// ============================================
+
+/**
+ * Field mapping configuration for data-driven scenarios.
+ * Maps dataset fields to fact type fields with optional transformations.
+ */
+export interface FieldMapping {
+  /** Source field name in dataset record */
+  datasetField: string;
+  /** Target field name in fact type */
+  factField: string;
+  /** Optional data type transformation */
+  transformation?: 'STRING' | 'INTEGER' | 'LONG' | 'DOUBLE' | 'BOOLEAN' | 'DATE';
+  /** Optional default value if source field is null/missing */
+  defaultValue?: unknown;
+}
+
+/**
+ * Dataset field information for schema display
+ */
+export interface DatasetFieldInfo {
+  name: string;
+  inferredType: 'STRING' | 'INTEGER' | 'DOUBLE' | 'BOOLEAN' | 'OBJECT' | 'ARRAY';
+  sampleValues: unknown[];
+  nullable: boolean;
+}
+
+/**
+ * Dataset schema response containing field information
+ */
+export interface DatasetSchemaResponse {
+  datasetId: string;
+  factType: string;
+  fields: DatasetFieldInfo[];
+  recordCount: number;
+}
+
+/**
+ * Result of executing a scenario against a single dataset record
+ */
+export interface RecordExecutionResult {
+  /** 0-based position in dataset */
+  recordIndex: number;
+  /** Record identifier (from recordIdentifierField or index) */
+  recordId: string;
+  /** Original dataset record */
+  originalRecord?: Record<string, unknown>;
+  /** Transformed fact data sent to Rule Inspector */
+  inputData?: Record<string, unknown>;
+  /** Whether this record passed validation */
+  success: boolean;
+  /** Rule Inspector response */
+  validationResponse?: Record<string, unknown>;
+  /** Assertion results for this record */
+  assertionResults?: AssertionResultDto[];
+  /** Rules that fired for this record */
+  rulesFired?: string[];
+  /** Execution time in milliseconds */
+  durationMs?: number;
+  /** Error message if failed */
+  errorMessage?: string;
+}
+
+/**
+ * Request for scenario preview (dry run)
+ */
+export interface ScenarioPreviewRequest {
+  /** Maximum number of records to preview */
+  maxRecords?: number;
+  /** Specific record indices to preview */
+  recordIndices?: number[];
+}
+
+/**
+ * Response from scenario preview
+ */
+export interface ScenarioPreviewResponse {
+  scenarioId: string;
+  previewResults: RecordExecutionResult[];
+  totalRecords: number;
+  previewCount: number;
 }

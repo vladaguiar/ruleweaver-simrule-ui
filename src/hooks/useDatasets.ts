@@ -3,7 +3,7 @@
 import * as XLSX from 'xlsx';
 import { useState, useEffect, useCallback } from 'react';
 import { datasetService } from '@/services';
-import type { DatasetResponse, UploadDatasetRequest, DatasetFilters } from '@/types/api.types';
+import type { DatasetResponse, UploadDatasetRequest, DatasetFilters, DatasetSchemaResponse } from '@/types/api.types';
 
 export interface UseDatasetsState {
   datasets: DatasetResponse[];
@@ -286,4 +286,146 @@ export function useDatasetPreview(file: File | null) {
   }, [file]);
 
   return { preview, loading, error };
+}
+
+// ============================================
+// Data-Driven Testing Hooks
+// ============================================
+
+/**
+ * Hook to get datasets compatible with a specific fact type
+ * Used by DatasetPicker to show only relevant datasets
+ */
+export function useCompatibleDatasets(factType: string | null) {
+  const [datasets, setDatasets] = useState<DatasetResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadDatasets = async () => {
+      if (!factType) {
+        setDatasets([]);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await datasetService.getDatasetsByFactType(factType);
+        setDatasets(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load compatible datasets');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDatasets();
+  }, [factType]);
+
+  const refresh = useCallback(async () => {
+    if (!factType) {
+      setDatasets([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await datasetService.getDatasetsByFactType(factType);
+      setDatasets(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load compatible datasets');
+    } finally {
+      setLoading(false);
+    }
+  }, [factType]);
+
+  return { datasets, loading, error, refresh };
+}
+
+/**
+ * Hook to get dataset schema (field information)
+ * Used by FieldMappingEditor to show available fields
+ */
+export function useDatasetSchema(datasetId: string | null) {
+  const [schema, setSchema] = useState<DatasetSchemaResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadSchema = async () => {
+      if (!datasetId) {
+        setSchema(null);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await datasetService.getDatasetSchema(datasetId);
+        setSchema(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load dataset schema');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSchema();
+  }, [datasetId]);
+
+  const refresh = useCallback(async () => {
+    if (!datasetId) {
+      setSchema(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await datasetService.getDatasetSchema(datasetId);
+      setSchema(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load dataset schema');
+    } finally {
+      setLoading(false);
+    }
+  }, [datasetId]);
+
+  return { schema, loading, error, refresh };
+}
+
+/**
+ * Hook to get preview records from a dataset
+ * Useful for field mapping preview in ScenarioEditor
+ */
+export function useDatasetPreviewRecords(datasetId: string | null, maxRecords: number = 5) {
+  const [records, setRecords] = useState<Record<string, unknown>[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadRecords = async () => {
+      if (!datasetId) {
+        setRecords([]);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await datasetService.getPreviewRecords(datasetId, maxRecords);
+        setRecords(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load preview records');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRecords();
+  }, [datasetId, maxRecords]);
+
+  return { records, loading, error };
 }

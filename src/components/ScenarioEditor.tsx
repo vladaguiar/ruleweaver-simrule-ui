@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Save, X, Play, ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Clock, Keyboard, Wand2 } from 'lucide-react';
+import { Save, X, Play, ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Clock, Keyboard, Wand2, Database, Info } from 'lucide-react';
 import { useScenario } from '@/hooks/useScenarios';
 import { useRuleSets } from '@/hooks/useRuleSets';
 import { useSchemas } from '@/hooks/useSchemas';
@@ -15,7 +15,10 @@ import type {
   AssertionDto,
   ExpectedResultDto,
   ScenarioStatus,
+  FieldMapping,
 } from '@/types/api.types';
+import { DatasetPicker } from '@/components/DatasetPicker';
+import { FieldMappingEditor } from '@/components/FieldMappingEditor';
 
 // Auto-save storage key prefix
 const AUTO_SAVE_KEY_PREFIX = 'simrule_scenario_autosave_';
@@ -52,6 +55,11 @@ interface AutoSaveData {
   expectedValidationPassed: boolean;
   assertions: AssertionDto[];
   savedAt: number;
+  // Data-driven testing fields
+  useDataset: boolean;
+  datasetId: string | null;
+  fieldMappings: FieldMapping[];
+  recordIdentifierField: string;
 }
 
 export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: ScenarioEditorProps) {
@@ -70,6 +78,12 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
   const [expectedRulesFired, setExpectedRulesFired] = useState<string[]>([]);
   const [expectedValidationPassed, setExpectedValidationPassed] = useState(true);
   const [assertions, setAssertions] = useState<AssertionDto[]>([]);
+
+  // Data-driven testing state
+  const [useDataset, setUseDataset] = useState(false);
+  const [datasetId, setDatasetId] = useState<string | null>(null);
+  const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
+  const [recordIdentifierField, setRecordIdentifierField] = useState('');
 
   // UI state
   const [activeTab, setActiveTab] = useState<'metadata' | 'testdata' | 'expected' | 'assertions'>('metadata');
@@ -120,7 +134,12 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
     expectedValidationPassed,
     assertions,
     savedAt: Date.now(),
-  }), [name, description, ruleSet, factType, testDataJson, tags, expectedRulesFired, expectedValidationPassed, assertions]);
+    // Data-driven testing fields
+    useDataset,
+    datasetId,
+    fieldMappings,
+    recordIdentifierField,
+  }), [name, description, ruleSet, factType, testDataJson, tags, expectedRulesFired, expectedValidationPassed, assertions, useDataset, datasetId, fieldMappings, recordIdentifierField]);
 
   // Check for auto-saved data on mount
   useEffect(() => {
@@ -176,7 +195,7 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
   useEffect(() => {
     if (initialLoadRef.current) return;
     setHasUnsavedChanges(true);
-  }, [name, description, ruleSet, factType, testDataJson, tags, expectedRulesFired, expectedValidationPassed, assertions]);
+  }, [name, description, ruleSet, factType, testDataJson, tags, expectedRulesFired, expectedValidationPassed, assertions, useDataset, datasetId, fieldMappings, recordIdentifierField]);
 
   // Warn about unsaved changes on navigation
   useEffect(() => {
@@ -210,6 +229,11 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
       setExpectedRulesFired(recoveredData.expectedRulesFired);
       setExpectedValidationPassed(recoveredData.expectedValidationPassed);
       setAssertions(recoveredData.assertions);
+      // Data-driven testing fields
+      setUseDataset(recoveredData.useDataset || false);
+      setDatasetId(recoveredData.datasetId || null);
+      setFieldMappings(recoveredData.fieldMappings || []);
+      setRecordIdentifierField(recoveredData.recordIdentifierField || '');
       setHasUnsavedChanges(true);
     }
     setShowRecoveryPrompt(false);
@@ -278,6 +302,11 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
       setExpectedRulesFired(scenario.expectedResult?.rulesFired || []);
       setExpectedValidationPassed(scenario.expectedResult?.validationPassed ?? true);
       setAssertions(scenario.assertions || []);
+      // Data-driven testing fields
+      setUseDataset(scenario.useDataset || false);
+      setDatasetId(scenario.datasetId || null);
+      setFieldMappings(scenario.fieldMappings || []);
+      setRecordIdentifierField(scenario.recordIdentifierField || '');
       // Mark initial load as complete after loading scenario data
       setTimeout(() => {
         initialLoadRef.current = false;
@@ -474,8 +503,16 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
       setActiveTab('metadata');
       return;
     }
-    if (!validateJson(testDataJson)) {
+    // Only validate JSON if not using dataset mode
+    if (!useDataset && !validateJson(testDataJson)) {
       setError('Test data contains invalid JSON');
+      setActiveTab('testdata');
+      return;
+    }
+
+    // Validate data-driven mode
+    if (useDataset && !datasetId) {
+      setError('Please select a dataset for data-driven testing');
       setActiveTab('testdata');
       return;
     }
@@ -494,11 +531,16 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
           description: description || undefined,
           ruleSet,
           factType,
-          testData: JSON.parse(testDataJson),
+          testData: useDataset ? {} : JSON.parse(testDataJson),
           expectedResult,
           assertions,
           tags,
           status,
+          // Data-driven testing fields
+          useDataset,
+          datasetId: useDataset ? datasetId || undefined : undefined,
+          fieldMappings: useDataset && fieldMappings.length > 0 ? fieldMappings : undefined,
+          recordIdentifierField: useDataset && recordIdentifierField ? recordIdentifierField : undefined,
         };
         await scenarioService.update(scenarioId, updateRequest);
         setSuccess('Scenario updated successfully');
@@ -508,10 +550,15 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
           description: description || undefined,
           ruleSet,
           factType,
-          testData: JSON.parse(testDataJson),
+          testData: useDataset ? {} : JSON.parse(testDataJson),
           expectedResult,
           assertions,
           tags,
+          // Data-driven testing fields
+          useDataset,
+          datasetId: useDataset ? datasetId || undefined : undefined,
+          fieldMappings: useDataset && fieldMappings.length > 0 ? fieldMappings : undefined,
+          recordIdentifierField: useDataset && recordIdentifierField ? recordIdentifierField : undefined,
         };
         const created = await scenarioService.create(createRequest);
 
@@ -988,107 +1035,218 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
 
           {/* Test Data Tab */}
           {activeTab === 'testdata' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <label style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
-                  Test Data (JSON) <span style={{ color: 'var(--color-error)' }}>*</span>
+            <div className="space-y-6">
+              {/* Mode Toggle */}
+              <div
+                className="flex items-center gap-6 p-4 rounded-lg"
+                style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+              >
+                <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
+                  Test Data Source:
+                </span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={!useDataset}
+                    onChange={() => setUseDataset(false)}
+                    style={{ accentColor: 'var(--color-primary)' }}
+                  />
+                  <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>Manual Entry</span>
                 </label>
-                <div className="flex items-center gap-3">
-                  {jsonError && (
-                    <span className="text-sm" style={{ color: 'var(--color-error)' }}>{jsonError}</span>
-                  )}
-                  <button
-                    onClick={handleGenerateSample}
-                    disabled={generatingSample || !factType.trim()}
-                    className="flex items-center gap-2 px-3 py-1.5 border rounded hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ borderColor: 'var(--color-border)', fontSize: '13px' }}
-                    title={factType.trim() ? 'Generate sample data based on fact type schema' : 'Please specify a Fact Type first'}
-                  >
-                    <Wand2 size={16} className={generatingSample ? 'animate-pulse' : ''} />
-                    {generatingSample ? 'Generating...' : 'Generate Sample'}
-                  </button>
-                </div>
-              </div>
-              <MonacoJsonEditor
-                value={testDataJson}
-                onChange={handleJsonChange}
-                onValidate={handleJsonValidation}
-                height={400}
-              />
-              {jsonValidationErrors.length > 1 && (
-                <div className="p-3 rounded" style={{ backgroundColor: '#FFEBEE' }}>
-                  <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-error)', marginBottom: '4px' }}>
-                    Validation Errors:
-                  </p>
-                  <ul className="list-disc list-inside">
-                    {jsonValidationErrors.slice(0, 5).map((err, idx) => (
-                      <li key={idx} style={{ fontSize: '12px', color: 'var(--color-error)' }}>{err}</li>
-                    ))}
-                    {jsonValidationErrors.length > 5 && (
-                      <li style={{ fontSize: '12px', color: 'var(--color-error)' }}>
-                        ...and {jsonValidationErrors.length - 5} more errors
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              )}
-
-              {/* Schema Validation Section */}
-              {schema && (
-                <div className="p-3 rounded" style={{ backgroundColor: '#E3F2FD', border: '1px solid #90CAF9' }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-primary)' }}>
-                      Schema: {schema.factType}
-                    </p>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                      {schema.fieldCount} fields ({schema.requiredFieldCount} required)
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={useDataset}
+                    onChange={() => setUseDataset(true)}
+                  />
+                  <div className="flex items-center gap-1">
+                    <Database size={16} style={{ color: useDataset ? 'var(--color-primary)' : 'var(--color-text-muted)' }} />
+                    <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>Use Dataset</span>
+                    <span
+                      className="px-2 py-0.5 rounded-full"
+                      style={{ fontSize: '10px', backgroundColor: '#E3F2FD', color: 'var(--color-primary)' }}
+                    >
+                      Data-Driven
                     </span>
                   </div>
-                  {schemaValidationErrors.length > 0 ? (
-                    <div className="mt-2 p-2 rounded" style={{ backgroundColor: '#FFF3E0', border: '1px solid #FFB74D' }}>
-                      <p style={{ fontSize: '11px', fontWeight: 500, color: '#E65100', marginBottom: '4px' }}>
-                        Schema Validation Issues:
+                </label>
+              </div>
+
+              {/* Dataset Mode */}
+              {useDataset ? (
+                <div className="space-y-6">
+                  {/* Dataset Picker */}
+                  <div>
+                    <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
+                      Select Dataset <span style={{ color: 'var(--color-error)' }}>*</span>
+                    </label>
+                    <DatasetPicker
+                      factType={factType || null}
+                      value={datasetId}
+                      onChange={setDatasetId}
+                      disabled={!factType}
+                      onNavigateToDatasets={() => onNavigate('datasets')}
+                    />
+                  </div>
+
+                  {/* Field Mappings (only show if dataset selected) */}
+                  {datasetId && (
+                    <div>
+                      <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
+                        Field Mappings
+                      </label>
+                      <FieldMappingEditor
+                        datasetId={datasetId}
+                        factType={factType}
+                        value={fieldMappings}
+                        onChange={setFieldMappings}
+                        factTypeFields={schema?.fields?.map((f) => f.name) || []}
+                      />
+                    </div>
+                  )}
+
+                  {/* Record Identifier */}
+                  {datasetId && (
+                    <div>
+                      <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
+                        Record Identifier Field <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={recordIdentifierField}
+                        onChange={(e) => setRecordIdentifierField(e.target.value)}
+                        placeholder="e.g., customerId, id, recordId"
+                        className="w-full max-w-md px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+                        style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
+                      />
+                      <p className="mt-1" style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                        Field to use as record ID in results. Leave empty to use array index.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Info Banner */}
+                  <div
+                    className="p-4 rounded-lg flex items-start gap-3"
+                    style={{ backgroundColor: '#E3F2FD', border: '1px solid #90CAF9' }}
+                  >
+                    <Info size={20} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '4px' }}>
+                        Data-Driven Mode
+                      </h4>
+                      <p style={{ fontSize: '13px', color: '#1565C0' }}>
+                        When you run a simulation with this scenario, it will execute <strong>once for each record</strong> in
+                        the selected dataset. Results will show pass/fail status for each record.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Manual Entry Mode - Original JSON Editor */
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <label style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
+                      Test Data (JSON) <span style={{ color: 'var(--color-error)' }}>*</span>
+                    </label>
+                    <div className="flex items-center gap-3">
+                      {jsonError && (
+                        <span className="text-sm" style={{ color: 'var(--color-error)' }}>{jsonError}</span>
+                      )}
+                      <button
+                        onClick={handleGenerateSample}
+                        disabled={generatingSample || !factType.trim()}
+                        className="flex items-center gap-2 px-3 py-1.5 border rounded hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ borderColor: 'var(--color-border)', fontSize: '13px' }}
+                        title={factType.trim() ? 'Generate sample data based on fact type schema' : 'Please specify a Fact Type first'}
+                      >
+                        <Wand2 size={16} className={generatingSample ? 'animate-pulse' : ''} />
+                        {generatingSample ? 'Generating...' : 'Generate Sample'}
+                      </button>
+                    </div>
+                  </div>
+                  <MonacoJsonEditor
+                    value={testDataJson}
+                    onChange={handleJsonChange}
+                    onValidate={handleJsonValidation}
+                    height={400}
+                  />
+                  {jsonValidationErrors.length > 1 && (
+                    <div className="p-3 rounded" style={{ backgroundColor: '#FFEBEE' }}>
+                      <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-error)', marginBottom: '4px' }}>
+                        Validation Errors:
                       </p>
                       <ul className="list-disc list-inside">
-                        {schemaValidationErrors.slice(0, 5).map((err, idx) => (
-                          <li key={idx} style={{ fontSize: '11px', color: '#E65100' }}>
-                            <strong>{err.field}:</strong> {err.message}
-                          </li>
+                        {jsonValidationErrors.slice(0, 5).map((err, idx) => (
+                          <li key={idx} style={{ fontSize: '12px', color: 'var(--color-error)' }}>{err}</li>
                         ))}
-                        {schemaValidationErrors.length > 5 && (
-                          <li style={{ fontSize: '11px', color: '#E65100' }}>
-                            ...and {schemaValidationErrors.length - 5} more issues
+                        {jsonValidationErrors.length > 5 && (
+                          <li style={{ fontSize: '12px', color: 'var(--color-error)' }}>
+                            ...and {jsonValidationErrors.length - 5} more errors
                           </li>
                         )}
                       </ul>
                     </div>
-                  ) : (
-                    <p style={{ fontSize: '11px', color: '#1B5E20' }}>
-                      ✓ Test data validates against schema
-                    </p>
                   )}
-                </div>
-              )}
 
-              {schemaLoading && (
-                <div className="p-3 rounded flex items-center gap-2" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: 'var(--color-primary)' }}></div>
-                  <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Loading schema for {factType}...</span>
-                </div>
-              )}
+                  {/* Schema Validation Section */}
+                  {schema && (
+                    <div className="p-3 rounded" style={{ backgroundColor: '#E3F2FD', border: '1px solid #90CAF9' }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-primary)' }}>
+                          Schema: {schema.factType}
+                        </p>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                          {schema.fieldCount} fields ({schema.requiredFieldCount} required)
+                        </span>
+                      </div>
+                      {schemaValidationErrors.length > 0 ? (
+                        <div className="mt-2 p-2 rounded" style={{ backgroundColor: '#FFF3E0', border: '1px solid #FFB74D' }}>
+                          <p style={{ fontSize: '11px', fontWeight: 500, color: '#E65100', marginBottom: '4px' }}>
+                            Schema Validation Issues:
+                          </p>
+                          <ul className="list-disc list-inside">
+                            {schemaValidationErrors.slice(0, 5).map((err, idx) => (
+                              <li key={idx} style={{ fontSize: '11px', color: '#E65100' }}>
+                                <strong>{err.field}:</strong> {err.message}
+                              </li>
+                            ))}
+                            {schemaValidationErrors.length > 5 && (
+                              <li style={{ fontSize: '11px', color: '#E65100' }}>
+                                ...and {schemaValidationErrors.length - 5} more issues
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: '11px', color: '#1B5E20' }}>
+                          ✓ Test data validates against schema
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-              {!schema && !schemaLoading && factType && (
-                <div className="p-3 rounded" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                  {schemaLoading && (
+                    <div className="p-3 rounded flex items-center gap-2" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: 'var(--color-primary)' }}></div>
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Loading schema for {factType}...</span>
+                    </div>
+                  )}
+
+                  {!schema && !schemaLoading && factType && (
+                    <div className="p-3 rounded" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                      <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                        No schema available for "{factType}". Test data will not be validated against a schema.
+                      </p>
+                    </div>
+                  )}
+
                   <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                    No schema available for "{factType}". Test data will not be validated against a schema.
+                    Enter the test data as a JSON object. This data will be passed to the rule engine.
+                    Use <kbd style={{ backgroundColor: 'var(--color-surface)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--color-border)' }}>Ctrl+Shift+F</kbd> to format the JSON.
                   </p>
                 </div>
               )}
-
-              <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                Enter the test data as a JSON object. This data will be passed to the rule engine.
-                Use <kbd style={{ backgroundColor: 'var(--color-surface)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--color-border)' }}>Ctrl+Shift+F</kbd> to format the JSON.
-              </p>
             </div>
           )}
 

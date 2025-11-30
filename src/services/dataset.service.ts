@@ -10,6 +10,8 @@ import type {
   UpdateDatasetRequest,
   DatasetFilters,
   DatasetFormat,
+  DatasetSchemaResponse,
+  DatasetFieldInfo,
 } from '@/types/api.types';
 
 // Validation constants
@@ -493,6 +495,114 @@ class DatasetService {
       byFormat,
       byFactType,
     };
+  }
+
+  // ============================================
+  // Data-Driven Testing Support Methods
+  // ============================================
+
+  /**
+   * Get datasets filtered by fact type
+   * Used by DatasetPicker to show only compatible datasets
+   */
+  async getDatasetsByFactType(factType: string, options?: RequestOptions): Promise<DatasetResponse[]> {
+    return this.getAll({ factType }, options);
+  }
+
+  /**
+   * Get dataset schema (field information) for field mapping
+   * Generates schema from the dataset's records, inferring types from values
+   */
+  async getDatasetSchema(datasetId: string, options?: RequestOptions): Promise<DatasetSchemaResponse> {
+    // First try to fetch from backend endpoint if available
+    try {
+      const endpoint = `${API_ENDPOINTS.DATASET_BY_ID(datasetId)}/schema`;
+      return await apiService.get<DatasetSchemaResponse>(endpoint, options);
+    } catch {
+      // If backend endpoint doesn't exist, generate schema client-side from records
+      const dataset = await this.getById(datasetId, options);
+      return this.generateSchemaFromRecords(dataset);
+    }
+  }
+
+  /**
+   * Generate schema from dataset records (client-side fallback)
+   * Analyzes records to infer field names, types, and sample values
+   */
+  private generateSchemaFromRecords(dataset: DatasetResponse): DatasetSchemaResponse {
+    const records = dataset.records || [];
+
+    if (records.length === 0) {
+      return {
+        datasetId: dataset.id,
+        factType: dataset.factType,
+        fields: [],
+        recordCount: 0,
+      };
+    }
+
+    // Collect all unique field names from all records
+    const fieldNames = new Set<string>();
+    records.forEach(record => {
+      Object.keys(record).forEach(key => fieldNames.add(key));
+    });
+
+    // Analyze each field
+    const fields: DatasetFieldInfo[] = Array.from(fieldNames).map(fieldName => {
+      const values = records.map(r => r[fieldName]).filter(v => v !== null && v !== undefined);
+      const sampleValues = values.slice(0, 5);
+
+      return {
+        name: fieldName,
+        inferredType: this.inferFieldType(values),
+        sampleValues,
+        nullable: records.some(r => r[fieldName] === null || r[fieldName] === undefined),
+      };
+    });
+
+    return {
+      datasetId: dataset.id,
+      factType: dataset.factType,
+      fields,
+      recordCount: dataset.recordCount,
+    };
+  }
+
+  /**
+   * Infer the data type from an array of values
+   */
+  private inferFieldType(values: unknown[]): DatasetFieldInfo['inferredType'] {
+    if (values.length === 0) return 'STRING';
+
+    // Check the type of first non-null value
+    const sample = values.find(v => v !== null && v !== undefined);
+    if (sample === undefined) return 'STRING';
+
+    if (typeof sample === 'boolean') return 'BOOLEAN';
+    if (typeof sample === 'number') {
+      // Check if all numbers are integers
+      const allIntegers = values.every(v =>
+        typeof v === 'number' && Number.isInteger(v)
+      );
+      return allIntegers ? 'INTEGER' : 'DOUBLE';
+    }
+    if (Array.isArray(sample)) return 'ARRAY';
+    if (typeof sample === 'object') return 'OBJECT';
+
+    return 'STRING';
+  }
+
+  /**
+   * Get preview of records from a dataset
+   * Useful for field mapping preview
+   */
+  async getPreviewRecords(
+    datasetId: string,
+    maxRecords: number = 5,
+    options?: RequestOptions
+  ): Promise<Record<string, unknown>[]> {
+    const dataset = await this.getById(datasetId, options);
+    return (dataset.records || []).slice(0, maxRecords);
   }
 }
 
