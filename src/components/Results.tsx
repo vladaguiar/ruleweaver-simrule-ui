@@ -212,6 +212,29 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
       lines.push(row.map(v => escape(v)).join(','));
     });
 
+    // Per-record execution results for data-driven scenarios
+    selectedSimulation.scenarioExecutions?.forEach(r => {
+      if (r.dataDriven && r.recordExecutions && r.recordExecutions.length > 0) {
+        lines.push('');
+        lines.push(`=== PER-RECORD RESULTS: ${r.scenarioName || r.scenarioId} ===`);
+
+        // Header row
+        const recordHeaders = ['Record ID', 'Status', 'Rules Fired', 'Duration'];
+        lines.push(recordHeaders.map(h => escape(h)).join(','));
+
+        // Record rows
+        r.recordExecutions.forEach(rec => {
+          const recordRow = [
+            rec.recordId,
+            rec.success ? 'Passed' : 'Failed',
+            rec.rulesFired?.length || 0,
+            rec.durationMs ? `${rec.durationMs}ms` : ''
+          ];
+          lines.push(recordRow.map(v => escape(v)).join(','));
+        });
+      }
+    });
+
     // Download
     const csvContent = lines.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -269,7 +292,19 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
           recordsFailed: r.recordsFailed,
           recordSuccessRate: r.totalRecords ? (r.recordsPassed || 0) / r.totalRecords : null
         } : null,
-        recordExecutions: r.recordExecutions
+        recordExecutions: r.dataDriven && r.recordExecutions
+          ? r.recordExecutions.map(rec => ({
+              recordId: rec.recordId,
+              recordIndex: rec.recordIndex,
+              status: rec.success ? 'Passed' : 'Failed',
+              success: rec.success,
+              rulesFired: rec.rulesFired,
+              rulesFiredCount: rec.rulesFired?.length || 0,
+              durationMs: rec.durationMs,
+              errorMessage: rec.errorMessage || null
+              // Note: inputData, originalRecord, validationResponse excluded
+            }))
+          : null
       }))
     };
 
