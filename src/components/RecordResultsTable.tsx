@@ -262,22 +262,25 @@ interface RecordDetailPanelProps {
 
 function RecordDetailPanel({ result }: RecordDetailPanelProps) {
   return (
-    <div className="p-4 space-y-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-      <div className="grid grid-cols-2 gap-4">
+    <div className="p-4 space-y-4" style={{ borderTop: '1px solid var(--color-border)', overflow: 'hidden' }}>
+      <div className="grid grid-cols-2 gap-4" style={{ overflow: 'hidden' }}>
         {/* Original Record */}
         {result.originalRecord && (
-          <div>
+          <div style={{ overflow: 'hidden', minWidth: 0 }}>
             <h5 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
               Original Record
             </h5>
             <pre
-              className="p-3 rounded overflow-auto"
+              className="p-3 rounded"
               style={{
                 backgroundColor: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
                 fontSize: '11px',
                 color: 'var(--color-text-primary)',
                 maxHeight: '150px',
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
               }}
             >
               {JSON.stringify(result.originalRecord, null, 2)}
@@ -287,18 +290,21 @@ function RecordDetailPanel({ result }: RecordDetailPanelProps) {
 
         {/* Transformed Fact Data */}
         {result.inputData && (
-          <div>
+          <div style={{ overflow: 'hidden', minWidth: 0 }}>
             <h5 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
               Transformed Fact Data
             </h5>
             <pre
-              className="p-3 rounded overflow-auto"
+              className="p-3 rounded"
               style={{
                 backgroundColor: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
                 fontSize: '11px',
                 color: 'var(--color-text-primary)',
                 maxHeight: '150px',
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
               }}
             >
               {JSON.stringify(result.inputData, null, 2)}
@@ -335,18 +341,21 @@ function RecordDetailPanel({ result }: RecordDetailPanelProps) {
 
         {/* Validation Response */}
         {result.validationResponse && (
-          <div>
+          <div style={{ overflow: 'hidden', minWidth: 0 }}>
             <h5 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
               Validation Response
             </h5>
             <pre
-              className="p-3 rounded overflow-auto"
+              className="p-3 rounded"
               style={{
                 backgroundColor: 'var(--color-background)',
                 border: '1px solid var(--color-border)',
                 fontSize: '11px',
                 color: 'var(--color-text-primary)',
                 maxHeight: '150px',
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
               }}
             >
               {JSON.stringify(result.validationResponse, null, 2)}
