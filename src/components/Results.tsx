@@ -138,17 +138,83 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
   const handleExportCSV = () => {
     if (!selectedSimulation) return;
 
-    const headers = ['Scenario Name', 'Status', 'Duration (ms)', 'Rules Fired', 'Error'];
-    const rows = selectedSimulation.scenarioExecutions?.map(r => [
-      r.scenarioName || r.scenarioId,
-      r.success ? 'PASSED' : 'FAILED',
-      r.durationMs?.toString() || '',
-      r.rulesFired?.join('; ') || '',
-      r.errorMessage || '',
-    ]) || [];
+    const lines: string[] = [];
+    const escape = (val: string | number | undefined | null) =>
+      `"${String(val ?? '').replace(/"/g, '""')}"`;
 
-    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    // Summary section
+    lines.push('=== SIMULATION SUMMARY ===');
+    lines.push(`Simulation ID,${escape(selectedSimulation.id)}`);
+    lines.push(`Simulation Name,${escape(selectedSimulation.name || 'Unnamed')}`);
+    lines.push(`Status,${escape(selectedSimulation.status)}`);
+    lines.push(`Executed At,${escape(selectedSimulation.startedAt || selectedSimulation.createdAt)}`);
+    lines.push(`Completed At,${escape(selectedSimulation.completedAt || '')}`);
+    lines.push(`Total Duration (ms),${selectedSimulation.metrics?.totalDurationMs || 0}`);
+    lines.push(`Total Scenarios,${selectedSimulation.metrics?.totalScenarios || 0}`);
+    lines.push(`Scenarios Passed,${selectedSimulation.metrics?.scenariosPassed || 0}`);
+    lines.push(`Scenarios Failed,${selectedSimulation.metrics?.scenariosFailed || 0}`);
+    lines.push(`Success Rate,${(selectedSimulation.metrics?.successRate || 0).toFixed(1)}%`);
+    lines.push('');
+
+    // Data-driven metrics (if applicable)
+    if (selectedSimulation.metrics?.dataDrivenScenarios) {
+      lines.push('=== DATA-DRIVEN METRICS ===');
+      lines.push(`Data-Driven Scenarios,${selectedSimulation.metrics.dataDrivenScenarios}`);
+      lines.push(`Total Records Processed,${selectedSimulation.metrics.totalRecordsProcessed || 0}`);
+      lines.push(`Records Passed,${selectedSimulation.metrics.totalRecordsPassed || 0}`);
+      lines.push(`Records Failed,${selectedSimulation.metrics.totalRecordsFailed || 0}`);
+      lines.push(`Record Success Rate,${(selectedSimulation.metrics.recordSuccessRate || 0).toFixed(1)}%`);
+      lines.push('');
+    }
+
+    // Scenario results header
+    lines.push('=== SCENARIO RESULTS ===');
+    const headers = [
+      'Scenario ID',
+      'Scenario Name',
+      'Status',
+      'Duration (ms)',
+      'Duration',
+      'Rules Fired Count',
+      'Rules Fired',
+      'Data-Driven',
+      'Dataset ID',
+      'Total Records',
+      'Records Passed',
+      'Records Failed',
+      'Record Success Rate',
+      'Error'
+    ];
+    lines.push(headers.map(h => escape(h)).join(','));
+
+    // Scenario rows
+    selectedSimulation.scenarioExecutions?.forEach(r => {
+      const recordSuccessRate = r.totalRecords && r.totalRecords > 0
+        ? ((r.recordsPassed || 0) / r.totalRecords * 100).toFixed(1) + '%'
+        : '';
+
+      const row = [
+        r.scenarioId,
+        r.scenarioName || r.scenarioId,
+        r.success ? 'PASSED' : 'FAILED',
+        r.durationMs || 0,
+        formatDuration(r.durationMs || 0),
+        r.rulesFired?.length || 0,
+        r.rulesFired?.join('; ') || '',
+        r.dataDriven ? 'Yes' : 'No',
+        r.datasetId || '',
+        r.totalRecords || '',
+        r.recordsPassed || '',
+        r.recordsFailed || '',
+        recordSuccessRate,
+        r.errorMessage || ''
+      ];
+      lines.push(row.map(v => escape(v)).join(','));
+    });
+
+    // Download
+    const csvContent = lines.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -160,11 +226,60 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
   const handleExportJSON = () => {
     if (!selectedSimulation) return;
 
-    const blob = new Blob([JSON.stringify(selectedSimulation, null, 2)], { type: 'application/json' });
+    const exportData = {
+      exportInfo: {
+        generatedAt: new Date().toISOString(),
+        exportVersion: '2.0'
+      },
+      simulation: {
+        id: selectedSimulation.id,
+        name: selectedSimulation.name,
+        status: selectedSimulation.status,
+        executionMode: selectedSimulation.executionMode,
+        startedAt: selectedSimulation.startedAt,
+        completedAt: selectedSimulation.completedAt,
+        executedBy: selectedSimulation.executedBy,
+        createdAt: selectedSimulation.createdAt
+      },
+      metrics: {
+        ...selectedSimulation.metrics,
+        dataDrivenMetrics: selectedSimulation.metrics?.dataDrivenScenarios ? {
+          dataDrivenScenarios: selectedSimulation.metrics.dataDrivenScenarios,
+          totalRecordsProcessed: selectedSimulation.metrics.totalRecordsProcessed,
+          totalRecordsPassed: selectedSimulation.metrics.totalRecordsPassed,
+          totalRecordsFailed: selectedSimulation.metrics.totalRecordsFailed,
+          recordSuccessRate: selectedSimulation.metrics.recordSuccessRate
+        } : null
+      },
+      scenarioExecutions: selectedSimulation.scenarioExecutions?.map(r => ({
+        scenarioId: r.scenarioId,
+        scenarioName: r.scenarioName,
+        success: r.success,
+        durationMs: r.durationMs,
+        durationFormatted: formatDuration(r.durationMs || 0),
+        rulesFired: r.rulesFired,
+        rulesFiredCount: r.rulesFired?.length || 0,
+        errorMessage: r.errorMessage || null,
+        assertionResults: r.assertionResults,
+        dataDriven: r.dataDriven || false,
+        datasetInfo: r.dataDriven ? {
+          datasetId: r.datasetId,
+          totalRecords: r.totalRecords,
+          recordsPassed: r.recordsPassed,
+          recordsFailed: r.recordsFailed,
+          recordSuccessRate: r.totalRecords ? (r.recordsPassed || 0) / r.totalRecords : null
+        } : null,
+        recordExecutions: r.recordExecutions
+      }))
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: 'application/json'
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `simulation-${selectedSimulation.id}-full.json`;
+    a.download = `simulation-${selectedSimulation.id}-report.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
