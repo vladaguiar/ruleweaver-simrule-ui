@@ -92,9 +92,11 @@ class CoverageService {
       ruleSets.map(async (ruleSet) => {
         try {
           const report = await this.getLatest(ruleSet, options);
+          // Filter ruleCoverage for untested rules (covered === false)
+          const untestedRules = report.ruleCoverage?.filter(r => !r.covered) || [];
           return {
             ruleSet,
-            rules: report.untestedRules,
+            rules: untestedRules,
           };
         } catch (err) {
           console.error(`Failed to get untested rules for "${ruleSet}":`, err);
@@ -113,29 +115,21 @@ class CoverageService {
 
   /**
    * Get coverage trends for a rule set
+   * Note: Trends are no longer included in coverage reports (v2.0 API change)
+   * This method now returns an empty array - use statistics/trends endpoint for trends
    */
   async getTrends(
-    ruleSet: string,
-    options?: RequestOptions
+    _ruleSet: string,
+    _options?: RequestOptions
   ): Promise<
     Array<{
       date: string;
       coverage: number;
     }>
   > {
-    const report = await this.getLatest(ruleSet, options);
-
-    if (!report.trends || report.trends.length === 0) {
-      return [];
-    }
-
-    return report.trends.map((t) => ({
-      date: new Date(t.timestamp).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      }),
-      coverage: t.coveragePercentage,
-    }));
+    // Trends array removed from CoverageReportResponse in v2.0 API
+    // Use separate statistics/trends endpoint if needed
+    return [];
   }
 
   /**
@@ -182,24 +176,31 @@ class CoverageService {
   > {
     const report = await this.getLatest(ruleSet, options);
 
-    const testedRules = report.testedRules.map((r) => ({
-      rule: r.ruleName,
-      hits: r.executionCount,
-      status: r.executionCount >= 10 ? 'covered' : 'low',
-      successRate: r.successRate || 100,
-    })) as Array<{
-      rule: string;
-      hits: number;
-      status: 'covered' | 'low' | 'untested';
-      successRate: number;
-    }>;
+    // Use ruleCoverage array with covered boolean filter (v2.0 API)
+    const allRules = report.ruleCoverage || [];
 
-    const untestedRules = report.untestedRules.map((r) => ({
-      rule: r.ruleName,
-      hits: 0,
-      status: 'untested' as const,
-      successRate: 0,
-    }));
+    const testedRules = allRules
+      .filter((r) => r.covered)
+      .map((r) => ({
+        rule: r.ruleName,
+        hits: r.executionCount,
+        status: r.executionCount >= 10 ? 'covered' : 'low',
+        successRate: 100, // successRate not available in RuleCoverageDto
+      })) as Array<{
+        rule: string;
+        hits: number;
+        status: 'covered' | 'low' | 'untested';
+        successRate: number;
+      }>;
+
+    const untestedRules = allRules
+      .filter((r) => !r.covered)
+      .map((r) => ({
+        rule: r.ruleName,
+        hits: 0,
+        status: 'untested' as const,
+        successRate: 0,
+      }));
 
     return [...testedRules, ...untestedRules];
   }

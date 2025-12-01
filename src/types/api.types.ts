@@ -175,6 +175,8 @@ export interface ScenarioExecutionDto {
   recordsFailed?: number;
   /** Per-record execution results */
   recordExecutions?: RecordExecutionResult[];
+  /** Fact object after rule execution (shows rule modifications) */
+  modifiedFact?: Record<string, unknown>;
 }
 
 export interface ExecutionMetricsDto {
@@ -667,6 +669,32 @@ export interface RecordExecutionResult {
   durationMs?: number;
   /** Error message if failed */
   errorMessage?: string;
+  /** Fact object after rule execution (shows rule modifications) */
+  modifiedFact?: Record<string, unknown>;
+}
+
+/**
+ * Detailed rule execution result from validationResponse.results
+ */
+export interface RuleExecutionResult {
+  /** Rule identifier (e.g., "RULE_004") */
+  ruleId: string;
+  /** Full rule name (e.g., "RULE_004 - Risk Category Assignment") */
+  ruleName: string;
+  /** Execution status */
+  status: 'APPLIED' | 'PASSED' | 'FAILED' | 'SKIPPED' | 'ERROR';
+  /** Execution message */
+  message: string;
+  /** Execution time in milliseconds */
+  executionTimeMs?: number;
+  /** Rule priority/salience */
+  priority?: number;
+  /** ISO timestamp when rule executed */
+  executedAt: string;
+  /** Key-value outputs from rule */
+  outputs?: Record<string, unknown>;
+  /** Agenda group if applicable */
+  agendaGroup?: string;
 }
 
 /**

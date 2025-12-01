@@ -1,6 +1,6 @@
 // RecordResultsTable Component - Display per-record execution results for data-driven testing
 import React, { useState, useMemo } from 'react';
-import { Check, X, ChevronDown, ChevronRight, Filter, AlertCircle, Clock, Zap } from 'lucide-react';
+import { Check, X, ChevronDown, ChevronRight, Filter, AlertCircle, Clock, Zap, Sparkles } from 'lucide-react';
 import type { RecordExecutionResult, AssertionResultDto } from '@/types/api.types';
 
 interface RecordResultsTableProps {
@@ -364,6 +364,14 @@ function RecordDetailPanel({ result }: RecordDetailPanelProps) {
         )}
       </div>
 
+      {/* Modified Fact Data (after rule execution) */}
+      {result.modifiedFact && (
+        <ModifiedFactSection
+          inputData={result.inputData}
+          modifiedFact={result.modifiedFact}
+        />
+      )}
+
       {/* Error Message */}
       {result.errorMessage && (
         <div
@@ -389,6 +397,191 @@ function RecordDetailPanel({ result }: RecordDetailPanelProps) {
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// Modified Fact section with visual diff and collapsible JSON
+interface ModifiedFactSectionProps {
+  inputData?: Record<string, unknown>;
+  modifiedFact: Record<string, unknown>;
+}
+
+function ModifiedFactSection({ inputData, modifiedFact }: ModifiedFactSectionProps) {
+  const [showRawJson, setShowRawJson] = useState(false);
+
+  // Calculate changed fields
+  const changedFields = useMemo(() => {
+    if (!inputData) return Object.keys(modifiedFact);
+    return Object.keys(modifiedFact).filter(
+      (key) => JSON.stringify(inputData[key]) !== JSON.stringify(modifiedFact[key])
+    );
+  }, [inputData, modifiedFact]);
+
+  // Calculate new fields (in modifiedFact but not in inputData)
+  const newFields = useMemo(() => {
+    if (!inputData) return [];
+    return Object.keys(modifiedFact).filter((key) => !(key in inputData));
+  }, [inputData, modifiedFact]);
+
+  return (
+    <div
+      className="p-4 rounded-lg"
+      style={{
+        backgroundColor: 'var(--color-background)',
+        border: '1px solid var(--color-primary)',
+        borderLeft: '4px solid var(--color-primary)',
+      }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h5
+          className="flex items-center gap-2"
+          style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)' }}
+        >
+          <Sparkles size={16} />
+          Modified Fact Data
+          {changedFields.length > 0 && (
+            <span
+              className="px-2 py-0.5 rounded"
+              style={{
+                fontSize: '11px',
+                backgroundColor: '#E3F2FD',
+                color: 'var(--color-primary)',
+              }}
+            >
+              {changedFields.length} field{changedFields.length !== 1 ? 's' : ''} changed
+            </span>
+          )}
+        </h5>
+        <button
+          onClick={() => setShowRawJson(!showRawJson)}
+          className="px-2 py-1 text-xs border rounded hover:bg-[var(--color-surface)] transition-colors"
+          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+        >
+          {showRawJson ? 'Hide JSON' : 'Show JSON'}
+        </button>
+      </div>
+
+      {/* Visual diff table */}
+      {changedFields.length > 0 && inputData ? (
+        <div
+          className="rounded overflow-hidden mb-3"
+          style={{ border: '1px solid var(--color-border)' }}
+        >
+          <table className="w-full" style={{ fontSize: '12px' }}>
+            <thead style={{ backgroundColor: 'var(--color-surface)' }}>
+              <tr>
+                <th
+                  className="p-2 text-left"
+                  style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}
+                >
+                  Field
+                </th>
+                <th
+                  className="p-2 text-left"
+                  style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}
+                >
+                  Before
+                </th>
+                <th
+                  className="p-2 text-left"
+                  style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}
+                >
+                  After
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {changedFields.map((field) => (
+                <tr
+                  key={field}
+                  style={{ borderTop: '1px solid var(--color-border)' }}
+                >
+                  <td className="p-2">
+                    <code
+                      style={{
+                        fontSize: '11px',
+                        backgroundColor: 'var(--color-surface)',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        color: 'var(--color-text-primary)',
+                      }}
+                    >
+                      {field}
+                    </code>
+                    {newFields.includes(field) && (
+                      <span
+                        className="ml-2 px-1 rounded"
+                        style={{
+                          fontSize: '10px',
+                          backgroundColor: '#E8F5E9',
+                          color: '#2E7D32',
+                        }}
+                      >
+                        NEW
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    <span
+                      style={{
+                        color: '#C62828',
+                        textDecoration: newFields.includes(field) ? 'none' : 'line-through',
+                        fontSize: '11px',
+                      }}
+                    >
+                      {newFields.includes(field)
+                        ? '—'
+                        : JSON.stringify(inputData[field] ?? null)}
+                    </span>
+                  </td>
+                  <td className="p-2">
+                    <span
+                      style={{
+                        color: '#2E7D32',
+                        fontWeight: 600,
+                        fontSize: '11px',
+                      }}
+                    >
+                      {JSON.stringify(modifiedFact[field])}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : changedFields.length === 0 && inputData ? (
+        <p
+          className="text-center py-3 rounded mb-3"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            fontSize: '12px',
+            color: 'var(--color-text-muted)',
+          }}
+        >
+          No fields were modified by rules
+        </p>
+      ) : null}
+
+      {/* Collapsible raw JSON */}
+      {showRawJson && (
+        <pre
+          className="p-3 rounded"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            fontSize: '11px',
+            color: 'var(--color-text-primary)',
+            maxHeight: '200px',
+            overflow: 'auto',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+          }}
+        >
+          {JSON.stringify(modifiedFact, null, 2)}
+        </pre>
       )}
     </div>
   );

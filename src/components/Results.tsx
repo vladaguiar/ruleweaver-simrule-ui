@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Download, FileText, Table, FileJson, RefreshCw, AlertCircle, ArrowLeft, ChevronRight, Calendar, Clock, CheckCircle, XCircle, AlertTriangle, Database } from 'lucide-react';
+import { Search, Download, FileText, Table, FileJson, RefreshCw, AlertCircle, ArrowLeft, ChevronRight, Calendar, Clock, CheckCircle, XCircle, AlertTriangle, Database, Sparkles } from 'lucide-react';
 import { simulationService } from '@/services';
 import { useAppContext } from '@/contexts/AppContext';
 import { Pagination } from '@/components/ui/Pagination';
@@ -31,6 +31,190 @@ function formatDuration(ms: number): string {
   const mins = Math.floor(ms / 60000);
   const secs = Math.floor((ms % 60000) / 1000);
   return `${mins}m ${secs}s`;
+}
+
+// Modified Fact section for scenario-level display
+interface ScenarioModifiedFactSectionProps {
+  inputData?: Record<string, unknown>;
+  modifiedFact: Record<string, unknown>;
+}
+
+function ScenarioModifiedFactSection({ inputData, modifiedFact }: ScenarioModifiedFactSectionProps) {
+  const [showRawJson, setShowRawJson] = React.useState(false);
+
+  // Calculate changed fields
+  const changedFields = React.useMemo(() => {
+    if (!inputData) return Object.keys(modifiedFact);
+    return Object.keys(modifiedFact).filter(
+      (key) => JSON.stringify(inputData[key]) !== JSON.stringify(modifiedFact[key])
+    );
+  }, [inputData, modifiedFact]);
+
+  // Calculate new fields (in modifiedFact but not in inputData)
+  const newFields = React.useMemo(() => {
+    if (!inputData) return [];
+    return Object.keys(modifiedFact).filter((key) => !(key in inputData));
+  }, [inputData, modifiedFact]);
+
+  return (
+    <div
+      className="bg-[var(--color-background)] rounded-lg p-6"
+      style={{
+        boxShadow: 'var(--shadow-1)',
+        border: '1px solid var(--color-primary)',
+        borderLeft: '4px solid var(--color-primary)',
+      }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Sparkles size={20} style={{ color: 'var(--color-primary)' }} />
+          <h3>Modified Fact Data</h3>
+          {changedFields.length > 0 && (
+            <span
+              className="px-2 py-0.5 rounded"
+              style={{
+                fontSize: '12px',
+                backgroundColor: '#E3F2FD',
+                color: 'var(--color-primary)',
+              }}
+            >
+              {changedFields.length} field{changedFields.length !== 1 ? 's' : ''} changed
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setShowRawJson(!showRawJson)}
+          className="px-3 py-1 text-sm border rounded hover:bg-[var(--color-surface)] transition-colors"
+          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+        >
+          {showRawJson ? 'Hide JSON' : 'Show JSON'}
+        </button>
+      </div>
+
+      {/* Visual diff table */}
+      {changedFields.length > 0 && inputData ? (
+        <div
+          className="rounded-lg overflow-hidden mb-4"
+          style={{ border: '1px solid var(--color-border)' }}
+        >
+          <table className="w-full">
+            <thead style={{ backgroundColor: 'var(--color-surface)' }}>
+              <tr>
+                <th
+                  className="text-left p-3"
+                  style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-muted)' }}
+                >
+                  Field
+                </th>
+                <th
+                  className="text-left p-3"
+                  style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-muted)' }}
+                >
+                  Before
+                </th>
+                <th
+                  className="text-left p-3"
+                  style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-muted)' }}
+                >
+                  After
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {changedFields.map((field) => (
+                <tr
+                  key={field}
+                  style={{ borderTop: '1px solid var(--color-border)' }}
+                >
+                  <td className="p-3">
+                    <code
+                      style={{
+                        fontSize: '13px',
+                        backgroundColor: 'var(--color-surface)',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        color: 'var(--color-text-primary)',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {field}
+                    </code>
+                    {newFields.includes(field) && (
+                      <span
+                        className="ml-2 px-1.5 py-0.5 rounded"
+                        style={{
+                          fontSize: '10px',
+                          backgroundColor: '#E8F5E9',
+                          color: '#2E7D32',
+                          fontWeight: 600,
+                        }}
+                      >
+                        NEW
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <span
+                      style={{
+                        color: '#C62828',
+                        textDecoration: newFields.includes(field) ? 'none' : 'line-through',
+                        fontSize: '13px',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {newFields.includes(field)
+                        ? '—'
+                        : JSON.stringify(inputData[field] ?? null)}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <span
+                      style={{
+                        color: '#2E7D32',
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      {JSON.stringify(modifiedFact[field])}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : changedFields.length === 0 && inputData ? (
+        <p
+          className="text-center py-4 rounded mb-4"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            fontSize: '14px',
+            color: 'var(--color-text-muted)',
+          }}
+        >
+          No fields were modified by rules
+        </p>
+      ) : null}
+
+      {/* Collapsible raw JSON */}
+      {showRawJson && (
+        <pre
+          className="p-4 rounded overflow-x-auto"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            fontSize: '12px',
+            color: 'var(--color-text-primary)',
+            fontFamily: 'monospace',
+            maxHeight: '300px',
+          }}
+        >
+          {JSON.stringify(modifiedFact, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
 }
 
 export function Results({ simulationId, onNavigate }: ResultsProps) {
@@ -219,7 +403,7 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
         lines.push(`=== PER-RECORD RESULTS: ${r.scenarioName || r.scenarioId} ===`);
 
         // Header row
-        const recordHeaders = ['Record ID', 'Status', 'Rules Fired', 'Duration'];
+        const recordHeaders = ['Record ID', 'Status', 'Rules Fired', 'Duration', 'Modified Fact'];
         lines.push(recordHeaders.map(h => escape(h)).join(','));
 
         // Record rows
@@ -228,10 +412,18 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
             rec.recordId,
             rec.success ? 'Passed' : 'Failed',
             rec.rulesFired?.length || 0,
-            rec.durationMs ? `${rec.durationMs}ms` : ''
+            rec.durationMs ? `${rec.durationMs}ms` : '',
+            rec.modifiedFact ? JSON.stringify(rec.modifiedFact) : ''
           ];
           lines.push(recordRow.map(v => escape(v)).join(','));
         });
+      }
+
+      // Add scenario-level modified fact
+      if (r.modifiedFact) {
+        lines.push('');
+        lines.push(`=== MODIFIED FACT: ${r.scenarioName || r.scenarioId} ===`);
+        lines.push(`"Modified Fact",${escape(JSON.stringify(r.modifiedFact))}`);
       }
     });
 
@@ -292,6 +484,7 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
           recordsFailed: r.recordsFailed,
           recordSuccessRate: r.totalRecords ? (r.recordsPassed || 0) / r.totalRecords : null
         } : null,
+        modifiedFact: r.modifiedFact || null,
         recordExecutions: r.dataDriven && r.recordExecutions
           ? r.recordExecutions.map(rec => ({
               recordId: rec.recordId,
@@ -301,8 +494,8 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
               rulesFired: rec.rulesFired,
               rulesFiredCount: rec.rulesFired?.length || 0,
               durationMs: rec.durationMs,
-              errorMessage: rec.errorMessage || null
-              // Note: inputData, originalRecord, validationResponse excluded
+              errorMessage: rec.errorMessage || null,
+              modifiedFact: rec.modifiedFact || null
             }))
           : null
       }))
@@ -505,16 +698,11 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
         )}
 
         {/* Modified Fact Data */}
-        {selectedScenarioResult.modifiedFactData && (
-          <div className="bg-[var(--color-background)] rounded-lg p-6" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
-            <h3 className="mb-4">Modified Fact Data</h3>
-            <pre
-              className="bg-[var(--color-surface)] p-4 rounded overflow-x-auto"
-              style={{ fontFamily: 'monospace', fontSize: '12px', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
-            >
-              {JSON.stringify(selectedScenarioResult.modifiedFactData, null, 2)}
-            </pre>
-          </div>
+        {selectedScenarioResult.modifiedFact && (
+          <ScenarioModifiedFactSection
+            inputData={selectedScenarioResult.inputData}
+            modifiedFact={selectedScenarioResult.modifiedFact}
+          />
         )}
       </div>
     );
