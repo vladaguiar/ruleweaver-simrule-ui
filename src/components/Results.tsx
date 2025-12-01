@@ -591,7 +591,7 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
               <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-primary)' }}>
                 {selectedScenarioResult.dataDriven
                   ? `${selectedScenarioResult.recordsPassed || 0} / ${selectedScenarioResult.totalRecords || 0}`
-                  : (selectedScenarioResult.validationPassed ? 'Valid' : 'Invalid')}
+                  : ((selectedScenarioResult.validationResponse as Record<string, unknown>)?.isValid === true ? 'Valid' : 'Invalid')}
               </p>
             </div>
           </div>
