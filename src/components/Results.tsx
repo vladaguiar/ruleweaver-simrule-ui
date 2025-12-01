@@ -436,24 +436,26 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
           </div>
         )}
 
-        {/* Data-Driven Results - Per-Record Execution */}
-        {selectedScenarioResult.dataDriven && selectedScenarioResult.recordExecutions && selectedScenarioResult.recordExecutions.length > 0 && (
+        {/* Per-Record Execution Results (for both data-driven and non-data-driven scenarios) */}
+        {selectedScenarioResult.recordExecutions && selectedScenarioResult.recordExecutions.length > 0 && (
           <div className="bg-[var(--color-background)] rounded-lg p-6" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
             <div className="flex items-center gap-2 mb-4">
               <Database size={20} style={{ color: 'var(--color-primary)' }} />
               <h3>Per-Record Execution Results</h3>
-              <span
-                className="px-2 py-0.5 rounded-full"
-                style={{ fontSize: '10px', backgroundColor: '#E3F2FD', color: 'var(--color-primary)' }}
-              >
-                Data-Driven
-              </span>
+              {selectedScenarioResult.dataDriven && (
+                <span
+                  className="px-2 py-0.5 rounded-full"
+                  style={{ fontSize: '10px', backgroundColor: '#E3F2FD', color: 'var(--color-primary)' }}
+                >
+                  Data-Driven
+                </span>
+              )}
             </div>
             <RecordResultsTable
               results={selectedScenarioResult.recordExecutions}
-              totalRecords={selectedScenarioResult.totalRecords || 0}
-              recordsPassed={selectedScenarioResult.recordsPassed || 0}
-              recordsFailed={selectedScenarioResult.recordsFailed || 0}
+              totalRecords={selectedScenarioResult.totalRecords || selectedScenarioResult.recordExecutions.length}
+              recordsPassed={selectedScenarioResult.recordsPassed || selectedScenarioResult.recordExecutions.filter(r => r.success).length}
+              recordsFailed={selectedScenarioResult.recordsFailed || selectedScenarioResult.recordExecutions.filter(r => !r.success).length}
             />
           </div>
         )}
