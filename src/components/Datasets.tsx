@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { Search, Upload, Eye, Download, Trash2, Database, X, FileJson, FileSpreadsheet, File, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Plus, Check, Edit } from 'lucide-react';
+import { Search, Upload, Eye, Download, Trash2, Database, X, FileJson, FileSpreadsheet, File, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, Plus, Check, Edit, FileText, Tag, CheckCircle } from 'lucide-react';
 import { useDatasets, useDatasetUpload, useDatasetPreview } from '@/hooks/useDatasets';
 import { useAppContext } from '@/contexts/AppContext';
 import type { DatasetResponse, DatasetFormat, DatasetFilters } from '@/types/api.types';
@@ -215,28 +215,35 @@ export function Datasets({ onNavigate }: DatasetsProps) {
         </div>
       </div>
 
-      {/* Statistics Summary */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-[var(--color-background)] rounded-lg p-4" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
-          <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>Total Datasets</p>
-          <p style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{datasets.length}</p>
-        </div>
-        <div className="bg-[var(--color-background)] rounded-lg p-4" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
-          <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>Total Records</p>
-          <p style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            {datasets.reduce((sum, d) => sum + d.recordCount, 0).toLocaleString()}
-          </p>
-        </div>
-        <div className="bg-[var(--color-background)] rounded-lg p-4" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
-          <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>Fact Types</p>
-          <p style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{factTypes.length}</p>
-        </div>
-        <div className="bg-[var(--color-background)] rounded-lg p-4" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
-          <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>In Use</p>
-          <p style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            {datasets.filter(d => d.usageCount > 0).length}
-          </p>
-        </div>
+      {/* Statistics Summary - Matching Dashboard KPI pattern */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4" style={{ gap: '20px' }}>
+        {[
+          { label: 'Total Datasets', value: datasets.length, icon: Database, color: 'var(--color-primary)' },
+          { label: 'Total Records', value: datasets.reduce((sum, d) => sum + d.recordCount, 0).toLocaleString(), icon: FileText, color: 'var(--color-accent)' },
+          { label: 'Fact Types', value: factTypes.length, icon: Tag, color: '#C3E770' },
+          { label: 'In Use', value: datasets.filter(d => d.usageCount > 0).length, icon: CheckCircle, color: 'var(--color-info)' },
+        ].map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <div
+              key={index}
+              className="bg-[var(--color-background)] rounded-lg p-6"
+              style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 rounded-lg" style={{ backgroundColor: `${stat.color}15` }}>
+                  <Icon size={24} style={{ color: stat.color }} />
+                </div>
+              </div>
+              <div style={{ fontSize: '32px', fontWeight: 700, color: 'var(--color-primary)', lineHeight: 1 }}>
+                {stat.value}
+              </div>
+              <div className="mt-2" style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+                {stat.label}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Datasets Grid */}
@@ -255,7 +262,7 @@ export function Datasets({ onNavigate }: DatasetsProps) {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3" style={{ marginTop: '5px', marginBottom: '5px', gap: '10px' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3" style={{ gap: '20px' }}>
           {filteredDatasets.map((dataset) => (
             <div
               key={dataset.id}
