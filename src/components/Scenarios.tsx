@@ -5,6 +5,13 @@ import { useRuleSets } from '@/hooks/useRuleSets';
 import { scenarioService, simulationService } from '@/services';
 import { useAppContext } from '@/contexts/AppContext';
 import { Pagination } from '@/components/ui/Pagination';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { exportToCSV, formatArrayForExport, formatDateForExport } from '@/utils/export';
 import type { ScenarioResponse, ScenarioStatus, PaginatedResponse } from '@/types/api.types';
 
@@ -55,7 +62,6 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
 
   // UI state
   const [showFilters, setShowFilters] = useState(false);
-  const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
 
@@ -188,7 +194,6 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
       });
     } finally {
       setProcessing(null);
-      setActionMenuOpen(null);
     }
   };
 
@@ -280,7 +285,6 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
       });
     } finally {
       setProcessing(null);
-      setActionMenuOpen(null);
     }
   };
 
@@ -302,7 +306,6 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
       });
     } finally {
       setProcessing(null);
-      setActionMenuOpen(null);
     }
   };
 
@@ -746,58 +749,60 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
                         >
                           <Edit2 size={18} style={{ color: 'var(--color-text-secondary)' }} />
                         </button>
-                        <button
-                          onClick={() => setActionMenuOpen(actionMenuOpen === scenario.id ? null : scenario.id)}
-                          className="p-2 hover:bg-[var(--color-surface)] rounded transition-colors"
-                          title="More actions"
-                        >
-                          <MoreVertical size={18} style={{ color: 'var(--color-text-secondary)' }} />
-                        </button>
-
-                        {/* Action Menu Dropdown */}
-                        {actionMenuOpen === scenario.id && (
-                          <div
-                            className="absolute right-0 top-full mt-1 py-2 bg-[var(--color-background)] rounded-lg z-10"
-                            style={{ boxShadow: 'var(--shadow-2)', border: '1px solid var(--color-border)', minWidth: '150px' }}
-                          >
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                             <button
+                              className="p-2 hover:bg-[var(--color-surface)] rounded transition-colors"
+                              title="More actions"
+                            >
+                              <MoreVertical size={18} style={{ color: 'var(--color-text-secondary)' }} />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="min-w-[150px]"
+                            style={{
+                              backgroundColor: 'var(--color-background)',
+                              border: '1px solid var(--color-border)',
+                              boxShadow: 'var(--shadow-2)'
+                            }}
+                          >
+                            <DropdownMenuItem
                               onClick={() => handleClone(scenario.id)}
-                              className="w-full px-4 py-2 text-left flex items-center gap-2 hover:bg-[var(--color-surface)] transition-colors"
+                              className="cursor-pointer"
                               style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}
                             >
-                              <Copy size={16} /> Clone
-                            </button>
+                              <Copy size={16} className="mr-2" /> Clone
+                            </DropdownMenuItem>
                             {scenario.status !== 'ACTIVE' && (
-                              <button
+                              <DropdownMenuItem
                                 onClick={() => handleActivate(scenario.id)}
-                                className="w-full px-4 py-2 text-left flex items-center gap-2 hover:bg-[var(--color-surface)] transition-colors"
+                                className="cursor-pointer"
                                 style={{ fontSize: '14px', color: 'var(--color-success)' }}
                               >
-                                <Check size={16} /> Activate
-                              </button>
+                                <Check size={16} className="mr-2" /> Activate
+                              </DropdownMenuItem>
                             )}
                             {scenario.status !== 'ARCHIVED' && (
-                              <button
+                              <DropdownMenuItem
                                 onClick={() => handleArchive(scenario.id)}
-                                className="w-full px-4 py-2 text-left flex items-center gap-2 hover:bg-[var(--color-surface)] transition-colors"
+                                className="cursor-pointer"
                                 style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}
                               >
-                                <Archive size={16} /> Archive
-                              </button>
+                                <Archive size={16} className="mr-2" /> Archive
+                              </DropdownMenuItem>
                             )}
-                            <hr className="my-2" style={{ borderColor: 'var(--color-border)' }} />
-                            <button
-                              onClick={() => {
-                                setActionMenuOpen(null);
-                                setConfirmDelete(scenario.id);
-                              }}
-                              className="w-full px-4 py-2 text-left flex items-center gap-2 hover:bg-[var(--color-surface)] transition-colors"
+                            <DropdownMenuSeparator style={{ backgroundColor: 'var(--color-border)' }} />
+                            <DropdownMenuItem
+                              onClick={() => setConfirmDelete(scenario.id)}
+                              className="cursor-pointer"
+                              variant="destructive"
                               style={{ fontSize: '14px', color: 'var(--color-error)' }}
                             >
-                              <Trash2 size={16} /> Delete
-                            </button>
-                          </div>
-                        )}
+                              <Trash2 size={16} className="mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>
@@ -895,13 +900,6 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         </div>
       )}
 
-      {/* Click outside to close action menu */}
-      {actionMenuOpen && (
-        <div
-          className="fixed inset-0 z-5"
-          onClick={() => setActionMenuOpen(null)}
-        />
-      )}
     </div>
   );
 }
