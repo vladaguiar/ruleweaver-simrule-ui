@@ -410,6 +410,15 @@ export interface HealthStatus {
 // Settings Types
 // ============================================
 
+export interface NotificationPreferences {
+  browserNotifications: boolean;
+  simulationComplete: boolean;
+  failedScenarios: boolean;
+  soundEffects: boolean;
+}
+
+export type ColorPreset = 'default' | 'ocean' | 'forest' | 'sunset';
+
 export interface AppSettings {
   apiBaseUrl: string;
   wsBaseUrl: string;
@@ -423,6 +432,8 @@ export interface AppSettings {
   maxConcurrentScenarios: number;
   editorTheme: 'vs-light' | 'vs-dark' | 'hc-black';
   tableDensity: 'compact' | 'standard' | 'comfortable';
+  colorPreset: ColorPreset;
+  notifications: NotificationPreferences;
 }
 
 // ============================================

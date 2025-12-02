@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { apiService } from '@/services';
+import { applyColorPreset } from '@/config/colorPresets';
 import type { AppSettings, ScenarioResponse, SimulationResponse } from '@/types/api.types';
 
 // Default settings
@@ -19,6 +20,13 @@ const defaultSettings: AppSettings = {
   maxConcurrentScenarios: 5,
   editorTheme: 'vs-light',
   tableDensity: 'standard',
+  colorPreset: 'default',
+  notifications: {
+    browserNotifications: true,
+    simulationComplete: true,
+    failedScenarios: true,
+    soundEffects: false,
+  },
 };
 
 // Context state interface
@@ -211,6 +219,13 @@ export function AppProvider({ children }: AppProviderProps) {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Apply color preset on initial load
+  useEffect(() => {
+    if (settings.colorPreset) {
+      applyColorPreset(settings.colorPreset);
+    }
+  }, []);
 
   const value: AppContextState = {
     userId,

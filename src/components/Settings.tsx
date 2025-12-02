@@ -4,7 +4,8 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useAppContext } from '@/contexts/AppContext';
 import { useTheme, Theme } from '@/contexts/ThemeContext';
 import { apiService } from '@/services/api.service';
-import type { AppSettings, ExecutionMode } from '@/types/api.types';
+import { COLOR_PRESETS, applyColorPreset } from '@/config/colorPresets';
+import type { AppSettings, ExecutionMode, ColorPreset } from '@/types/api.types';
 
 // Default settings
 const DEFAULT_SETTINGS: AppSettings = {
@@ -20,6 +21,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   maxConcurrentScenarios: 5,
   editorTheme: 'vs-light',
   tableDensity: 'standard',
+  colorPreset: 'default',
+  notifications: {
+    browserNotifications: true,
+    simulationComplete: true,
+    failedScenarios: true,
+    soundEffects: false,
+  },
 };
 
 type ConnectionStatus = 'idle' | 'testing' | 'success' | 'error';
@@ -49,14 +57,26 @@ export function Settings() {
   // Save settings
   const handleSave = () => {
     setSettings(formData);
+    // Apply color preset when saving
+    if (formData.colorPreset) {
+      applyColorPreset(formData.colorPreset);
+    }
     addNotification({ type: 'success', title: 'Settings Saved', message: 'Settings saved successfully' });
     setHasChanges(false);
   };
+
+  // Apply color preset on initial load
+  useEffect(() => {
+    if (settings.colorPreset) {
+      applyColorPreset(settings.colorPreset);
+    }
+  }, []);
 
   // Reset to defaults
   const handleReset = () => {
     setFormData(DEFAULT_SETTINGS);
     setSettings(DEFAULT_SETTINGS);
+    applyColorPreset('default');
     addNotification({ type: 'info', title: 'Settings Reset', message: 'Settings reset to defaults' });
     setHasChanges(false);
   };
@@ -501,14 +521,35 @@ export function Settings() {
                   </p>
                 </div>
 
+                <div>
+                  <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
+                    Color Preset
+                  </label>
+                  <select
+                    value={formData.colorPreset || 'default'}
+                    onChange={(e) => updateField('colorPreset', e.target.value as ColorPreset)}
+                    className="w-full px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+                    style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
+                  >
+                    {Object.entries(COLOR_PRESETS).map(([key, preset]) => (
+                      <option key={key} value={key}>
+                        {preset.name} - {preset.description}
+                      </option>
+                    ))}
+                  </select>
+                  <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                    Choose a color scheme for the application. Save to apply changes.
+                  </p>
+                </div>
+
                 <div className="p-6 rounded" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-                  <h5 className="mb-3" style={{ color: 'var(--color-text-primary)' }}>Theme Preview</h5>
+                  <h5 className="mb-3" style={{ color: 'var(--color-text-primary)' }}>Color Preview</h5>
                   <div className="space-y-2">
                     <div className="p-3 bg-[var(--color-primary)] text-white rounded">
-                      Primary Color: #285A84
+                      Primary Color
                     </div>
                     <div className="p-3 rounded" style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}>
-                      Accent Color: #FD9071
+                      Accent Color
                     </div>
                     <div className="p-3 rounded" style={{ backgroundColor: 'var(--color-success)', color: 'white' }}>
                       Success Color
@@ -535,7 +576,12 @@ export function Settings() {
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" defaultChecked className="sr-only peer" />
+                    <input
+                      type="checkbox"
+                      checked={formData.notifications?.browserNotifications ?? true}
+                      onChange={(e) => updateField('notifications', { ...formData.notifications, browserNotifications: e.target.checked })}
+                      className="sr-only peer"
+                    />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--color-primary)]"></div>
                   </label>
                 </div>
@@ -548,7 +594,12 @@ export function Settings() {
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" defaultChecked className="sr-only peer" />
+                    <input
+                      type="checkbox"
+                      checked={formData.notifications?.simulationComplete ?? true}
+                      onChange={(e) => updateField('notifications', { ...formData.notifications, simulationComplete: e.target.checked })}
+                      className="sr-only peer"
+                    />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--color-primary)]"></div>
                   </label>
                 </div>
@@ -561,7 +612,12 @@ export function Settings() {
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" defaultChecked className="sr-only peer" />
+                    <input
+                      type="checkbox"
+                      checked={formData.notifications?.failedScenarios ?? true}
+                      onChange={(e) => updateField('notifications', { ...formData.notifications, failedScenarios: e.target.checked })}
+                      className="sr-only peer"
+                    />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--color-primary)]"></div>
                   </label>
                 </div>
@@ -574,7 +630,12 @@ export function Settings() {
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" />
+                    <input
+                      type="checkbox"
+                      checked={formData.notifications?.soundEffects ?? false}
+                      onChange={(e) => updateField('notifications', { ...formData.notifications, soundEffects: e.target.checked })}
+                      className="sr-only peer"
+                    />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--color-primary)]"></div>
                   </label>
                 </div>
