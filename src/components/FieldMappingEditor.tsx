@@ -160,62 +160,78 @@ export function FieldMappingEditor({
 
   return (
     <div className="space-y-4">
-      {/* Action buttons (title provided by parent ScenarioEditor) */}
-      <div className="flex justify-end items-center">
-        <div className="flex gap-2">
-          {value.length > 0 && (
-            <button
-              type="button"
-              onClick={resetToDefaults}
-              disabled={disabled}
-              className="flex items-center gap-1 px-3 py-1 text-sm border rounded hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
-              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
-            >
-              <RefreshCw size={14} />
-              Reset
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={addMapping}
-            disabled={disabled}
-            className="flex items-center gap-1 px-3 py-1 text-sm rounded hover:opacity-90 transition-opacity disabled:opacity-50"
-            style={{ backgroundColor: '#E3F2FD', color: 'var(--color-primary)' }}
-          >
-            <Plus size={14} />
-            Add Mapping
-          </button>
-        </div>
-      </div>
-
       {/* Empty state */}
       {value.length === 0 ? (
-        <div
-          className="p-6 rounded-lg text-center"
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            border: '1px dashed var(--color-border)',
-          }}
-        >
-          <Info size={32} style={{ color: 'var(--color-text-muted)', margin: '0 auto 12px' }} />
-          <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
-            No field mappings configured
-          </p>
-          <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '16px' }}>
-            Dataset fields will be passed through directly to the fact type.
-          </p>
-          <button
-            type="button"
-            onClick={addMapping}
-            disabled={disabled}
-            className="px-4 py-2 rounded hover:opacity-90 transition-opacity disabled:opacity-50"
-            style={{ backgroundColor: 'var(--color-primary)', color: 'white', fontSize: '13px' }}
+        <>
+          {/* Action buttons for empty state */}
+          <div className="flex justify-end items-center" style={{ marginLeft: '5px', marginRight: '5px' }}>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={addMapping}
+                disabled={disabled}
+                className="flex items-center gap-1 px-3 py-1 text-sm rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                style={{ backgroundColor: '#E3F2FD', color: 'var(--color-primary)' }}
+              >
+                <Plus size={14} />
+                Add Mapping
+              </button>
+            </div>
+          </div>
+          <div
+            className="p-6 rounded-lg text-center"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              border: '1px dashed var(--color-border)',
+            }}
           >
-            Add a mapping to transform fields
-          </button>
-        </div>
+            <Info size={32} style={{ color: 'var(--color-text-muted)', margin: '0 auto 12px' }} />
+            <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
+              No field mappings configured
+            </p>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '16px' }}>
+              Dataset fields will be passed through directly to the fact type.
+            </p>
+            <button
+              type="button"
+              onClick={addMapping}
+              disabled={disabled}
+              className="px-4 py-2 rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+              style={{ backgroundColor: 'var(--color-primary)', color: 'white', fontSize: '13px' }}
+            >
+              Add a mapping to transform fields
+            </button>
+          </div>
+        </>
       ) : (
-        <div className="flex flex-col gap-[1.5px]" style={{ marginLeft: '5px', marginRight: '5px' }}>
+        <div style={{ marginLeft: '5px', marginRight: '5px', width: 'fit-content' }}>
+          {/* Action buttons - right-aligned within fit-content container */}
+          <div className="flex justify-end items-center mb-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={resetToDefaults}
+                disabled={disabled}
+                className="flex items-center gap-1 px-3 py-1 text-sm border rounded hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+              >
+                <RefreshCw size={14} />
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={addMapping}
+                disabled={disabled}
+                className="flex items-center gap-1 px-3 py-1 text-sm rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+                style={{ backgroundColor: '#E3F2FD', color: 'var(--color-primary)' }}
+              >
+                <Plus size={14} />
+                Add Mapping
+              </button>
+            </div>
+          </div>
+          {/* Mapping rows */}
+          <div className="flex flex-col gap-[1.5px]">
           {/* Mapping rows - horizontal single-line cards */}
           {value.map((mapping, index) => (
             <MappingRow
@@ -230,6 +246,7 @@ export function FieldMappingEditor({
               getTypeBadgeStyle={getTypeBadgeStyle}
             />
           ))}
+          </div>
         </div>
       )}
 
