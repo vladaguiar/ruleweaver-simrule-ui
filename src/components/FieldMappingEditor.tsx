@@ -160,11 +160,8 @@ export function FieldMappingEditor({
 
   return (
     <div className="space-y-4">
-      {/* Header with actions */}
-      <div className="flex justify-between items-center">
-        <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-          Field Mappings
-        </h4>
+      {/* Action buttons (title provided by parent ScenarioEditor) */}
+      <div className="flex justify-end items-center">
         <div className="flex gap-2">
           {value.length > 0 && (
             <button
@@ -218,7 +215,7 @@ export function FieldMappingEditor({
           </button>
         </div>
       ) : (
-        <div className="flex flex-col gap-[5px]">
+        <div className="flex flex-col gap-[1.5px]">
           {/* Mapping rows - horizontal single-line cards */}
           {value.map((mapping, index) => (
             <MappingRow
@@ -294,7 +291,7 @@ function MappingRow({
 
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2 rounded-lg"
+      className="flex items-center gap-[10px] px-4 py-2.5 rounded-lg"
       style={{
         backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
@@ -322,12 +319,13 @@ function MappingRow({
         ))}
       </select>
 
-      {/* Type badge - inline */}
+      {/* Type badge - inline with fixed width for alignment */}
       {selectedField && (
         <span
-          className="px-2 py-0.5 rounded whitespace-nowrap"
+          className="px-2 py-0.5 rounded whitespace-nowrap text-center"
           style={{
             fontSize: '10px',
+            minWidth: '70px',
             backgroundColor: getTypeBadgeStyle(selectedField.inferredType).bg,
             color: getTypeBadgeStyle(selectedField.inferredType).color,
           }}
@@ -340,20 +338,20 @@ function MappingRow({
       {/* Arrow */}
       <ArrowRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
 
-      {/* Fact Field */}
+      {/* Fact Field - fixed width for consistent alignment */}
       <input
         type="text"
         value={mapping.factField}
         onChange={(e) => onUpdate({ factField: e.target.value })}
         placeholder="Fact field name"
         disabled={disabled}
-        className="flex-1 px-3 py-1.5 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+        className="px-3 py-1.5 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
         style={{
           borderColor: 'var(--color-border)',
           fontSize: '13px',
           backgroundColor: 'var(--color-background)',
           color: 'var(--color-text-primary)',
-          minWidth: '150px',
+          width: '200px',
         }}
         list={`fact-fields-${index}`}
       />
@@ -390,12 +388,12 @@ function MappingRow({
         ))}
       </select>
 
-      {/* Remove button - right-justified */}
+      {/* Remove button */}
       <button
         type="button"
         onClick={onRemove}
         disabled={disabled}
-        className="p-1.5 rounded hover:bg-[#FFEBEE] transition-colors disabled:opacity-50 ml-auto"
+        className="p-1.5 rounded hover:bg-[#FFEBEE] transition-colors disabled:opacity-50"
         title="Remove mapping"
       >
         <Trash2 size={16} style={{ color: 'var(--color-error)' }} />
