@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Plus, Filter, Play, Copy, Trash2, Check, RefreshCw, AlertCircle, Edit2, Archive, MoreVertical, X, Download } from 'lucide-react';
 import { useScenarios } from '@/hooks/useScenarios';
 import { useRuleSets } from '@/hooks/useRuleSets';
@@ -832,9 +833,9 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
       </div>
 
       {/* Delete Confirmation Dialog */}
-      {confirmDelete && (
+      {confirmDelete && createPortal(
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[var(--color-background)] rounded-lg p-6 max-w-md w-full mx-4" style={{ boxShadow: 'var(--shadow-3)' }}>
+          <div className="rounded-lg p-6 mx-4" style={{ backgroundColor: 'var(--color-background)', boxShadow: 'var(--shadow-3)', width: '400px', maxWidth: 'calc(100vw - 32px)' }}>
             <h3 className="mb-4" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-primary)' }}>
               Confirm Delete
             </h3>
@@ -844,22 +845,25 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 border rounded hover:bg-[var(--color-surface)] transition-colors"
+                className="px-4 py-2 border rounded transition-colors"
                 style={{ borderColor: 'var(--color-border)', fontSize: '14px' }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface)'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(confirmDelete)}
                 disabled={processing === confirmDelete}
-                className="px-4 py-2 bg-[var(--color-error)] text-white rounded hover:opacity-90 transition-colors disabled:opacity-50"
-                style={{ fontSize: '14px' }}
+                className="px-4 py-2 text-white rounded hover:opacity-90 transition-colors disabled:opacity-50"
+                style={{ backgroundColor: 'var(--color-error)', fontSize: '14px' }}
               >
                 {processing === confirmDelete ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Bulk Actions Bar */}
