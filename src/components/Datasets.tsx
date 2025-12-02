@@ -216,7 +216,7 @@ export function Datasets({ onNavigate }: DatasetsProps) {
       </div>
 
       {/* Statistics Summary - Matching Dashboard KPI pattern */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4" style={{ gap: '20px' }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4" style={{ gap: '5px' }}>
         {[
           { label: 'Total Datasets', value: datasets.length, icon: Database, color: 'var(--color-primary)' },
           { label: 'Total Records', value: datasets.reduce((sum, d) => sum + d.recordCount, 0).toLocaleString(), icon: FileText, color: 'var(--color-accent)' },
@@ -262,7 +262,7 @@ export function Datasets({ onNavigate }: DatasetsProps) {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3" style={{ gap: '20px' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3" style={{ gap: '5px', marginTop: '5px', marginBottom: '5px' }}>
           {filteredDatasets.map((dataset) => (
             <div
               key={dataset.id}
