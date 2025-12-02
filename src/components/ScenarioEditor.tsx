@@ -1080,7 +1080,7 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
               {useDataset ? (
                 <div className="space-y-6">
                   {/* Dataset Picker */}
-                  <div>
+                  <div style={{ marginLeft: '5px', marginRight: '5px' }}>
                     <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
                       Select Dataset <span style={{ color: 'var(--color-error)' }}>*</span>
                     </label>

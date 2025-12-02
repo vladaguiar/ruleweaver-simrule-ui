@@ -340,13 +340,13 @@ function MappingRow({
         ))}
       </select>
 
-      {/* Type badge - 20px from dropdown, fixed 50px width */}
+      {/* Type badge - 20px from dropdown, fixed 65px width to fit "STRING (null)" */}
       {selectedField && (
         <span
           className="py-0.5 rounded whitespace-nowrap text-center"
           style={{
             fontSize: '10px',
-            width: '50px',
+            width: '65px',
             marginLeft: '20px',
             backgroundColor: getTypeBadgeStyle(selectedField.inferredType).bg,
             color: getTypeBadgeStyle(selectedField.inferredType).color,
@@ -357,7 +357,7 @@ function MappingRow({
         </span>
       )}
       {/* Placeholder for badge alignment when no field selected */}
-      {!selectedField && <span style={{ width: '50px', marginLeft: '20px' }} />}
+      {!selectedField && <span style={{ width: '65px', marginLeft: '20px' }} />}
 
       {/* Arrow - 15px gap before */}
       <ArrowRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0, marginLeft: '15px' }} />
