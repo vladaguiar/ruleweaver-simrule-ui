@@ -291,10 +291,12 @@ function MappingRow({
 
   return (
     <div
-      className="flex items-center gap-[10px] px-4 py-2.5 rounded-lg"
+      className="flex items-center py-2.5 rounded-lg"
       style={{
         backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
+        paddingLeft: '10px',
+        paddingRight: '10px',
       }}
     >
       {/* Dataset Field */}
@@ -319,26 +321,29 @@ function MappingRow({
         ))}
       </select>
 
-      {/* Type badge - inline with fixed width for alignment */}
+      {/* Type badge - 20px from dropdown, fixed 50px width */}
       {selectedField && (
         <span
-          className="px-2 py-0.5 rounded whitespace-nowrap text-center"
+          className="py-0.5 rounded whitespace-nowrap text-center"
           style={{
             fontSize: '10px',
-            minWidth: '70px',
+            width: '50px',
+            marginLeft: '20px',
             backgroundColor: getTypeBadgeStyle(selectedField.inferredType).bg,
             color: getTypeBadgeStyle(selectedField.inferredType).color,
           }}
         >
           {selectedField.inferredType}
-          {selectedField.nullable && ' (nullable)'}
+          {selectedField.nullable && ' (null)'}
         </span>
       )}
+      {/* Placeholder for badge alignment when no field selected */}
+      {!selectedField && <span style={{ width: '50px', marginLeft: '20px' }} />}
 
-      {/* Arrow */}
-      <ArrowRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+      {/* Arrow - 15px gap before */}
+      <ArrowRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0, marginLeft: '15px' }} />
 
-      {/* Fact Field - fixed width for consistent alignment */}
+      {/* Fact Field - 15px gap, fixed width for consistent alignment */}
       <input
         type="text"
         value={mapping.factField}
@@ -352,6 +357,7 @@ function MappingRow({
           backgroundColor: 'var(--color-background)',
           color: 'var(--color-text-primary)',
           width: '200px',
+          marginLeft: '15px',
         }}
         list={`fact-fields-${index}`}
       />
@@ -363,7 +369,7 @@ function MappingRow({
         </datalist>
       )}
 
-      {/* Transformation */}
+      {/* Transformation - 15px gap */}
       <select
         value={mapping.transformation || ''}
         onChange={(e) =>
@@ -379,6 +385,7 @@ function MappingRow({
           backgroundColor: 'var(--color-background)',
           color: 'var(--color-text-primary)',
           minWidth: '160px',
+          marginLeft: '15px',
         }}
       >
         {TRANSFORMATION_OPTIONS.map((opt) => (
@@ -388,12 +395,13 @@ function MappingRow({
         ))}
       </select>
 
-      {/* Remove button */}
+      {/* Remove button - 15px gap */}
       <button
         type="button"
         onClick={onRemove}
         disabled={disabled}
         className="p-1.5 rounded hover:bg-[#FFEBEE] transition-colors disabled:opacity-50"
+        style={{ marginLeft: '15px' }}
         title="Remove mapping"
       >
         <Trash2 size={16} style={{ color: 'var(--color-error)' }} />
