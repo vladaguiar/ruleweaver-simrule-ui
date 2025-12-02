@@ -172,10 +172,14 @@ class ScenarioService {
 
   /**
    * Clone an existing scenario
+   * @param scenarioId - ID of the scenario to clone
+   * @param newName - Optional name for the cloned scenario
+   * @param options - Optional request options
    */
-  async clone(scenarioId: string, options?: RequestOptions): Promise<ScenarioResponse> {
+  async clone(scenarioId: string, newName?: string, options?: RequestOptions): Promise<ScenarioResponse> {
     const endpoint = API_ENDPOINTS.SCENARIO_CLONE(scenarioId);
-    return apiService.post<ScenarioResponse, object>(endpoint, {}, options);
+    const body = newName ? { name: newName } : {};
+    return apiService.post<ScenarioResponse, object>(endpoint, body, options);
   }
 
   /**
