@@ -215,7 +215,7 @@ export function FieldMappingEditor({
           </button>
         </div>
       ) : (
-        <div className="flex flex-col gap-[1.5px]">
+        <div className="flex flex-col gap-[1.5px]" style={{ marginLeft: '5px', marginRight: '5px' }}>
           {/* Mapping rows - horizontal single-line cards */}
           {value.map((mapping, index) => (
             <MappingRow
@@ -239,6 +239,8 @@ export function FieldMappingEditor({
         style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
+          marginLeft: '5px',
+          marginRight: '5px',
         }}
       >
         <Info size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0, marginTop: '2px' }} />
@@ -295,8 +297,8 @@ function MappingRow({
       style={{
         backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
-        paddingLeft: '10px',
-        paddingRight: '10px',
+        paddingLeft: '15px',
+        paddingRight: '15px',
       }}
     >
       {/* Dataset Field */}
