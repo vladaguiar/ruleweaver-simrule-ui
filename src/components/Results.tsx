@@ -234,11 +234,15 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | SimulationStatus>('all');
   const [scenarioStatusFilter, setScenarioStatusFilter] = useState<'all' | 'PASSED' | 'FAILED' | 'ERROR'>('all');
 
-  // Pagination (0-based page index)
+  // Pagination for simulations list (0-based page index)
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+
+  // Pagination for scenario results within simulation detail view
+  const [scenarioResultsPage, setScenarioResultsPage] = useState(0);
+  const [scenarioResultsPageSize, setScenarioResultsPageSize] = useState(10);
 
   // Load simulations list
   const loadSimulations = useCallback(async () => {
@@ -317,6 +321,18 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
       (scenarioStatusFilter === 'FAILED' && result.success === false);
     return matchesSearch && matchesStatus;
   }) || [];
+
+  // Paginate scenario results
+  const paginatedScenarioResults = filteredScenarioResults.slice(
+    scenarioResultsPage * scenarioResultsPageSize,
+    (scenarioResultsPage + 1) * scenarioResultsPageSize
+  );
+  const scenarioResultsTotalPages = Math.ceil(filteredScenarioResults.length / scenarioResultsPageSize) || 1;
+
+  // Reset scenario results page when search/filter changes
+  useEffect(() => {
+    setScenarioResultsPage(0);
+  }, [searchTerm, scenarioStatusFilter, selectedSimulation?.id]);
 
   // Export functions
   const handleExportCSV = () => {
@@ -809,7 +825,7 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
 
         {/* Results Table */}
         <div className="bg-[var(--color-background)] rounded-lg overflow-hidden" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
             {filteredScenarioResults.length === 0 ? (
               <div className="text-center py-12">
                 <AlertCircle size={48} style={{ color: 'var(--color-text-muted)', margin: '0 auto 16px' }} />
@@ -827,7 +843,7 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredScenarioResults.map((result) => (
+                  {paginatedScenarioResults.map((result) => (
                     <React.Fragment key={result.scenarioId}>
                       <tr
                         className="border-b hover:bg-[var(--color-surface)] cursor-pointer transition-colors"
@@ -893,6 +909,31 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
               </table>
             )}
           </div>
+
+          {/* Pagination for scenario results */}
+          {filteredScenarioResults.length > 0 && (
+            <div className="p-4 border-t" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
+              <Pagination
+                currentPage={scenarioResultsPage}
+                totalPages={scenarioResultsTotalPages}
+                totalElements={filteredScenarioResults.length}
+                pageSize={scenarioResultsPageSize}
+                onPageChange={(page) => {
+                  if (page >= 0 && page < scenarioResultsTotalPages) {
+                    setScenarioResultsPage(page);
+                  }
+                }}
+                onPageSizeChange={(size) => {
+                  setScenarioResultsPageSize(size);
+                  setScenarioResultsPage(0);
+                }}
+                pageSizeOptions={[5, 10, 20, 50]}
+                showPageSizeSelector={true}
+                showPageInfo={true}
+                showFirstLast={true}
+              />
+            </div>
+          )}
         </div>
 
         {/* Export Options */}
