@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Save, X, Play, ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Clock, Keyboard, Wand2, Database, Info } from 'lucide-react';
+import { Save, X, Play, ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle, Clock, Keyboard, Wand2, Database, Info, FileText, CheckSquare, ListChecks } from 'lucide-react';
 import { useScenario } from '@/hooks/useScenarios';
 import { useRuleSets } from '@/hooks/useRuleSets';
 import { useSchemas } from '@/hooks/useSchemas';
@@ -870,26 +870,30 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
       <div className="bg-[var(--color-background)] rounded-lg overflow-visible" style={{ boxShadow: 'var(--shadow-1)', border: '1px solid var(--color-border)' }}>
         <div className="flex border-b" style={{ borderColor: 'var(--color-border)' }}>
           {[
-            { id: 'metadata', label: 'Metadata' },
-            { id: 'testdata', label: 'Test Data' },
-            { id: 'expected', label: 'Expected Results' },
-            { id: 'assertions', label: 'Assertions' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className="px-6 py-4 transition-all"
-              style={{
-                fontSize: '14px',
-                fontWeight: activeTab === tab.id ? 600 : 400,
-                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                borderBottom: activeTab === tab.id ? '3px solid var(--color-primary)' : 'none',
-                backgroundColor: activeTab === tab.id ? 'var(--color-surface)' : 'transparent',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+            { id: 'metadata', label: 'Metadata', icon: FileText },
+            { id: 'testdata', label: 'Test Data', icon: Database },
+            { id: 'expected', label: 'Expected Results', icon: CheckSquare },
+            { id: 'assertions', label: 'Assertions', icon: ListChecks },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className="px-6 py-4 transition-all flex items-center gap-2"
+                style={{
+                  fontSize: '14px',
+                  fontWeight: activeTab === tab.id ? 600 : 400,
+                  color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  borderBottom: activeTab === tab.id ? '3px solid var(--color-primary)' : '3px solid transparent',
+                  backgroundColor: activeTab === tab.id ? 'var(--color-surface)' : 'transparent',
+                }}
+              >
+                <Icon size={18} />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="p-6">
