@@ -206,7 +206,7 @@ export function FieldMappingEditor({
       ) : (
         <>
           {/* Action buttons - right-aligned */}
-          <div className="flex justify-end items-center mb-2">
+          <div className="flex justify-end items-center mb-2" style={{ marginLeft: '5px', marginRight: '5px' }}>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -231,7 +231,7 @@ export function FieldMappingEditor({
             </div>
           </div>
           {/* Mapping rows */}
-          <div className="flex flex-col gap-[2px]">
+          <div className="flex flex-col gap-[2px]" style={{ marginLeft: '5px', marginRight: '5px' }}>
             {/* Mapping rows - horizontal single-line cards */}
             {value.map((mapping, index) => (
               <MappingRow
@@ -256,6 +256,8 @@ export function FieldMappingEditor({
         style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
+          marginLeft: '5px',
+          marginRight: '5px',
         }}
       >
         <Info size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0, marginTop: '2px' }} />

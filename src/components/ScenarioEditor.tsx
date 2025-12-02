@@ -1096,7 +1096,7 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
                   {/* Field Mappings (only show if dataset selected) */}
                   {datasetId && (
                     <div>
-                      <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
+                      <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)', marginLeft: '5px' }}>
                         Field Mappings
                       </label>
                       <FieldMappingEditor
@@ -1111,7 +1111,7 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
 
                   {/* Record Identifier */}
                   {datasetId && (
-                    <div>
+                    <div style={{ marginLeft: '5px', marginRight: '5px' }}>
                       <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}>
                         Record Identifier Field <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>(Optional)</span>
                       </label>
@@ -1132,7 +1132,7 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
                   {/* Info Banner */}
                   <div
                     className="p-4 rounded-lg flex items-start gap-3"
-                    style={{ backgroundColor: '#E3F2FD', border: '1px solid #90CAF9' }}
+                    style={{ backgroundColor: '#E3F2FD', border: '1px solid #90CAF9', marginLeft: '5px', marginRight: '5px' }}
                   >
                     <Info size={20} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
                     <div>
