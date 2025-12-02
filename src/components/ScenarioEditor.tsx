@@ -1121,9 +1121,9 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
                         onChange={(e) => setRecordIdentifierField(e.target.value)}
                         placeholder="e.g., customerId, id, recordId"
                         className="w-full max-w-md px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
-                        style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)', marginLeft: '5px' }}
+                        style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
                       />
-                      <p className="mt-1" style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginLeft: '5px' }}>
+                      <p className="mt-1" style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
                         Field to use as record ID in results. Leave empty to use array index.
                       </p>
                     </div>
@@ -1132,7 +1132,7 @@ export function ScenarioEditor({ scenarioId, onNavigate, onSave, onCancel }: Sce
                   {/* Info Banner */}
                   <div
                     className="p-4 rounded-lg flex items-start gap-3"
-                    style={{ backgroundColor: '#E3F2FD', border: '1px solid #90CAF9', marginLeft: '5px', marginRight: '5px' }}
+                    style={{ backgroundColor: '#E3F2FD', border: '1px solid #90CAF9' }}
                   >
                     <Info size={20} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
                     <div>

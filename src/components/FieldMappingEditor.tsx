@@ -164,7 +164,7 @@ export function FieldMappingEditor({
       {value.length === 0 ? (
         <>
           {/* Action buttons for empty state */}
-          <div className="flex justify-end items-center" style={{ marginLeft: '5px', marginRight: '5px' }}>
+          <div className="flex justify-end items-center">
             <div className="flex gap-2">
               <button
                 type="button"
@@ -204,8 +204,8 @@ export function FieldMappingEditor({
           </div>
         </>
       ) : (
-        <div style={{ marginLeft: '5px', marginRight: '5px', width: 'fit-content' }}>
-          {/* Action buttons - right-aligned within fit-content container */}
+        <>
+          {/* Action buttons - right-aligned */}
           <div className="flex justify-end items-center mb-2">
             <div className="flex gap-2">
               <button
@@ -231,23 +231,23 @@ export function FieldMappingEditor({
             </div>
           </div>
           {/* Mapping rows */}
-          <div className="flex flex-col gap-[1.5px]">
-          {/* Mapping rows - horizontal single-line cards */}
-          {value.map((mapping, index) => (
-            <MappingRow
-              key={index}
-              mapping={mapping}
-              index={index}
-              datasetFields={datasetFields}
-              factTypeFields={factTypeFields}
-              disabled={disabled}
-              onUpdate={(updates) => updateMapping(index, updates)}
-              onRemove={() => removeMapping(index)}
-              getTypeBadgeStyle={getTypeBadgeStyle}
-            />
-          ))}
+          <div className="flex flex-col gap-[2px]">
+            {/* Mapping rows - horizontal single-line cards */}
+            {value.map((mapping, index) => (
+              <MappingRow
+                key={index}
+                mapping={mapping}
+                index={index}
+                datasetFields={datasetFields}
+                factTypeFields={factTypeFields}
+                disabled={disabled}
+                onUpdate={(updates) => updateMapping(index, updates)}
+                onRemove={() => removeMapping(index)}
+                getTypeBadgeStyle={getTypeBadgeStyle}
+              />
+            ))}
           </div>
-        </div>
+        </>
       )}
 
       {/* Help text */}
@@ -256,8 +256,6 @@ export function FieldMappingEditor({
         style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
-          marginLeft: '5px',
-          marginRight: '5px',
         }}
       >
         <Info size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0, marginTop: '2px' }} />
@@ -388,7 +386,7 @@ function MappingRow({
         </datalist>
       )}
 
-      {/* Transformation - 15px gap */}
+      {/* Transformation - 15px gap, flex-1 to fill remaining space */}
       <select
         value={mapping.transformation || ''}
         onChange={(e) =>
@@ -397,7 +395,7 @@ function MappingRow({
           })
         }
         disabled={disabled}
-        className="px-3 py-1.5 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+        className="flex-1 px-3 py-1.5 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
         style={{
           borderColor: 'var(--color-border)',
           fontSize: '13px',
