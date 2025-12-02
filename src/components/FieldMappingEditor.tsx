@@ -218,20 +218,8 @@ export function FieldMappingEditor({
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
-          {/* Header row */}
-          <div
-            className="grid grid-cols-12 gap-2 px-2 py-1"
-            style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}
-          >
-            <div className="col-span-4">Dataset Field</div>
-            <div className="col-span-1 text-center"></div>
-            <div className="col-span-3">Fact Field</div>
-            <div className="col-span-3">Transform</div>
-            <div className="col-span-1"></div>
-          </div>
-
-          {/* Mapping rows */}
+        <div className="flex flex-col gap-[5px]">
+          {/* Mapping rows - horizontal single-line cards */}
           {value.map((mapping, index) => (
             <MappingRow
               key={index}
@@ -306,118 +294,112 @@ function MappingRow({
 
   return (
     <div
-      className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg"
-      style={{ backgroundColor: 'var(--color-surface)' }}
+      className="flex items-center gap-3 px-3 py-2 rounded-lg"
+      style={{
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+      }}
     >
       {/* Dataset Field */}
-      <div className="col-span-4">
-        <select
-          value={mapping.datasetField}
-          onChange={(e) => onUpdate({ datasetField: e.target.value })}
-          disabled={disabled}
-          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+      <select
+        value={mapping.datasetField}
+        onChange={(e) => onUpdate({ datasetField: e.target.value })}
+        disabled={disabled}
+        className="px-3 py-1.5 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+        style={{
+          borderColor: 'var(--color-border)',
+          fontSize: '13px',
+          backgroundColor: 'var(--color-background)',
+          color: 'var(--color-text-primary)',
+          minWidth: '180px',
+        }}
+      >
+        <option value="">Select field...</option>
+        {datasetFields.map((f) => (
+          <option key={f.name} value={f.name}>
+            {f.name} ({f.inferredType})
+          </option>
+        ))}
+      </select>
+
+      {/* Type badge - inline */}
+      {selectedField && (
+        <span
+          className="px-2 py-0.5 rounded whitespace-nowrap"
           style={{
-            borderColor: 'var(--color-border)',
-            fontSize: '13px',
-            backgroundColor: 'var(--color-background)',
-            color: 'var(--color-text-primary)',
+            fontSize: '10px',
+            backgroundColor: getTypeBadgeStyle(selectedField.inferredType).bg,
+            color: getTypeBadgeStyle(selectedField.inferredType).color,
           }}
         >
-          <option value="">Select field...</option>
-          {datasetFields.map((f) => {
-            const typeStyle = getTypeBadgeStyle(f.inferredType);
-            return (
-              <option key={f.name} value={f.name}>
-                {f.name} ({f.inferredType})
-              </option>
-            );
-          })}
-        </select>
-        {/* Show type badge below select */}
-        {selectedField && (
-          <span
-            className="inline-block mt-1 px-2 py-0.5 rounded"
-            style={{
-              fontSize: '10px',
-              backgroundColor: getTypeBadgeStyle(selectedField.inferredType).bg,
-              color: getTypeBadgeStyle(selectedField.inferredType).color,
-            }}
-          >
-            {selectedField.inferredType}
-            {selectedField.nullable && ' (nullable)'}
-          </span>
-        )}
-      </div>
+          {selectedField.inferredType}
+          {selectedField.nullable && ' (nullable)'}
+        </span>
+      )}
 
       {/* Arrow */}
-      <div className="col-span-1 text-center">
-        <ArrowRight size={18} style={{ color: 'var(--color-text-muted)' }} />
-      </div>
+      <ArrowRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
 
       {/* Fact Field */}
-      <div className="col-span-3">
-        <input
-          type="text"
-          value={mapping.factField}
-          onChange={(e) => onUpdate({ factField: e.target.value })}
-          placeholder="Fact field name"
-          disabled={disabled}
-          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
-          style={{
-            borderColor: 'var(--color-border)',
-            fontSize: '13px',
-            backgroundColor: 'var(--color-background)',
-            color: 'var(--color-text-primary)',
-          }}
-          list={`fact-fields-${index}`}
-        />
-        {factTypeFields.length > 0 && (
-          <datalist id={`fact-fields-${index}`}>
-            {factTypeFields.map((f) => (
-              <option key={f} value={f} />
-            ))}
-          </datalist>
-        )}
-      </div>
+      <input
+        type="text"
+        value={mapping.factField}
+        onChange={(e) => onUpdate({ factField: e.target.value })}
+        placeholder="Fact field name"
+        disabled={disabled}
+        className="flex-1 px-3 py-1.5 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+        style={{
+          borderColor: 'var(--color-border)',
+          fontSize: '13px',
+          backgroundColor: 'var(--color-background)',
+          color: 'var(--color-text-primary)',
+          minWidth: '150px',
+        }}
+        list={`fact-fields-${index}`}
+      />
+      {factTypeFields.length > 0 && (
+        <datalist id={`fact-fields-${index}`}>
+          {factTypeFields.map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
+      )}
 
       {/* Transformation */}
-      <div className="col-span-3">
-        <select
-          value={mapping.transformation || ''}
-          onChange={(e) =>
-            onUpdate({
-              transformation: (e.target.value as FieldMapping['transformation']) || undefined,
-            })
-          }
-          disabled={disabled}
-          className="w-full px-3 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
-          style={{
-            borderColor: 'var(--color-border)',
-            fontSize: '13px',
-            backgroundColor: 'var(--color-background)',
-            color: 'var(--color-text-primary)',
-          }}
-        >
-          {TRANSFORMATION_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <select
+        value={mapping.transformation || ''}
+        onChange={(e) =>
+          onUpdate({
+            transformation: (e.target.value as FieldMapping['transformation']) || undefined,
+          })
+        }
+        disabled={disabled}
+        className="px-3 py-1.5 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+        style={{
+          borderColor: 'var(--color-border)',
+          fontSize: '13px',
+          backgroundColor: 'var(--color-background)',
+          color: 'var(--color-text-primary)',
+          minWidth: '160px',
+        }}
+      >
+        {TRANSFORMATION_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
 
-      {/* Remove button */}
-      <div className="col-span-1 text-center">
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={disabled}
-          className="p-2 rounded hover:bg-[#FFEBEE] transition-colors disabled:opacity-50"
-          title="Remove mapping"
-        >
-          <Trash2 size={16} style={{ color: 'var(--color-error)' }} />
-        </button>
-      </div>
+      {/* Remove button - right-justified */}
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={disabled}
+        className="p-1.5 rounded hover:bg-[#FFEBEE] transition-colors disabled:opacity-50 ml-auto"
+        title="Remove mapping"
+      >
+        <Trash2 size={16} style={{ color: 'var(--color-error)' }} />
+      </button>
     </div>
   );
 }
