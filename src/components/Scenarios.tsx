@@ -211,6 +211,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         type: 'success',
         title: 'Simulation Started',
         message: `Running scenario: ${scenario?.name}`,
+        category: 'simulation',
       });
       onNavigate('results', { simulationId: simulation.id });
     } catch (e) {
@@ -218,6 +219,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         type: 'error',
         title: 'Failed to Run',
         message: e instanceof Error ? e.message : 'Failed to start simulation',
+        category: 'simulation',
       });
     } finally {
       setProcessing(null);
@@ -233,6 +235,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         type: 'success',
         title: 'Scenario Cloned',
         message: `Created: ${cloned.name}`,
+        category: 'scenario',
       });
       loadScenarios();
     } catch (e) {
@@ -240,6 +243,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         type: 'error',
         title: 'Clone Failed',
         message: e instanceof Error ? e.message : 'Failed to clone scenario',
+        category: 'scenario',
       });
     } finally {
       setProcessing(null);
@@ -254,6 +258,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         type: 'success',
         title: 'Scenario Deleted',
         message: 'Scenario has been deleted',
+        category: 'scenario',
       });
       setConfirmDelete(null);
       loadScenarios();
@@ -262,6 +267,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         type: 'error',
         title: 'Delete Failed',
         message: e instanceof Error ? e.message : 'Failed to delete scenario',
+        category: 'scenario',
       });
     } finally {
       setProcessing(null);
@@ -287,18 +293,21 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
           type: 'success',
           title: 'Scenarios Deleted',
           message: `Successfully deleted ${result.successCount} scenario(s)`,
+          category: 'scenario',
         });
       } else if (result.successCount > 0) {
         addNotification({
           type: 'warning',
           title: 'Partial Success',
           message: `Deleted ${result.successCount} scenario(s), but ${result.failureCount} failed`,
+          category: 'scenario',
         });
       } else {
         addNotification({
           type: 'error',
           title: 'Delete Failed',
           message: `Failed to delete ${result.failureCount} scenario(s)`,
+          category: 'scenario',
         });
       }
 
@@ -310,6 +319,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         type: 'error',
         title: 'Bulk Delete Failed',
         message: e instanceof Error ? e.message : 'Failed to delete scenarios',
+        category: 'scenario',
       });
     } finally {
       setProcessing(null);
@@ -324,6 +334,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         type: 'success',
         title: 'Scenario Archived',
         message: 'Scenario has been archived',
+        category: 'scenario',
       });
       loadScenarios();
     } catch (e) {
@@ -331,6 +342,7 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
         type: 'error',
         title: 'Archive Failed',
         message: e instanceof Error ? e.message : 'Failed to archive scenario',
+        category: 'scenario',
       });
     } finally {
       setProcessing(null);

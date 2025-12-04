@@ -4,16 +4,31 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 type SetValue<T> = T | ((prevValue: T) => T);
 
+interface LocalStorageOptions<T> {
+  serialize?: (value: T) => string;
+  deserialize?: (value: string) => T;
+}
+
 export function useLocalStorage<T>(
   key: string,
-  initialValue: T
+  initialValue: T,
+  options?: LocalStorageOptions<T>
 ): [T, (value: SetValue<T>) => void, () => void] {
+  // Custom serializers or defaults
+  const serialize = options?.serialize || ((v: T) => JSON.stringify(v));
+  const deserialize = options?.deserialize || ((v: string) => JSON.parse(v) as T);
   // Use refs to avoid recreating callbacks when values change
   const keyRef = useRef(key);
   keyRef.current = key;
 
   const initialValueRef = useRef(initialValue);
   initialValueRef.current = initialValue;
+
+  // Store serializers in refs to use in callbacks
+  const serializeRef = useRef(serialize);
+  serializeRef.current = serialize;
+  const deserializeRef = useRef(deserialize);
+  deserializeRef.current = deserialize;
 
   // Get value from localStorage or use initial value
   const readValue = useCallback((): T => {
@@ -23,7 +38,7 @@ export function useLocalStorage<T>(
 
     try {
       const item = window.localStorage.getItem(keyRef.current);
-      return item ? (JSON.parse(item) as T) : initialValueRef.current;
+      return item ? deserializeRef.current(item) : initialValueRef.current;
     } catch (error) {
       console.warn(`Error reading localStorage key "${keyRef.current}":`, error);
       return initialValueRef.current;
@@ -44,7 +59,7 @@ export function useLocalStorage<T>(
           const valueToStore = value instanceof Function ? value(prevValue) : value;
 
           if (typeof window !== 'undefined') {
-            window.localStorage.setItem(keyRef.current, JSON.stringify(valueToStore));
+            window.localStorage.setItem(keyRef.current, serializeRef.current(valueToStore));
           }
 
           return valueToStore;
@@ -76,7 +91,7 @@ export function useLocalStorage<T>(
         isStorageUpdateRef.current = true;
         try {
           if (event.newValue !== null) {
-            setStoredValue(JSON.parse(event.newValue) as T);
+            setStoredValue(deserializeRef.current(event.newValue));
           } else {
             // Key was removed
             setStoredValue(initialValueRef.current);

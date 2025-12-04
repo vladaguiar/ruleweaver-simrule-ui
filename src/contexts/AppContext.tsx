@@ -55,9 +55,12 @@ interface AppContextState {
 
   // Notifications
   notifications: Notification[];
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
+  unreadCount: number;
+  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
   dismissNotification: (id: string) => void;
   clearNotifications: () => void;
+  markAsRead: (id: string) => void;
+  markAllAsRead: () => void;
 
   // Recent items
   recentScenarios: ScenarioResponse[];
@@ -73,6 +76,8 @@ interface Notification {
   message?: string;
   timestamp: Date;
   autoDismiss?: boolean;
+  read: boolean;
+  category?: 'simulation' | 'scenario' | 'dataset' | 'coverage' | 'system';
 }
 
 // Create context
@@ -96,11 +101,30 @@ export function AppProvider({ children }: AppProviderProps) {
     []
   );
 
+  // Persisted notifications - use useLocalStorage with custom serializer for Date objects
+  const [storedNotifications, setStoredNotifications] = useLocalStorage<Notification[]>(
+    'simrule_notifications',
+    [],
+    {
+      serialize: (value) => JSON.stringify(value),
+      deserialize: (value) => {
+        const parsed = JSON.parse(value);
+        // Restore Date objects from ISO strings
+        return parsed.map((n: Notification & { timestamp: string }) => ({
+          ...n,
+          timestamp: new Date(n.timestamp),
+        }));
+      },
+    }
+  );
+
   // Local state
   const [apiStatus, setApiStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   const [availableRuleSets, setAvailableRuleSets] = useState<string[]>([]);
   const [selectedRuleSet, setSelectedRuleSet] = useState<string | null>(settings.defaultRuleSet || null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // Compute unread count from stored notifications
+  const unreadCount = storedNotifications.filter((n) => !n.read).length;
 
   // TODO: Replace hardcoded user with actual authentication system
   // In production, user info should come from:
@@ -155,31 +179,61 @@ export function AppProvider({ children }: AppProviderProps) {
 
   // Notifications
   const addNotification = useCallback(
-    (notification: Omit<Notification, 'id' | 'timestamp'>) => {
+    (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+      const prefs = settings.notifications;
+
+      // Check if this notification type should be shown based on preferences
+      if (notification.category === 'simulation' && !prefs.simulationComplete) {
+        return; // Don't show simulation completion notifications if disabled
+      }
+      if (notification.type === 'error' && notification.category === 'scenario' && !prefs.failedScenarios) {
+        return; // Don't show failed scenario notifications if disabled
+      }
+
       const newNotification: Notification = {
         ...notification,
         id: crypto.randomUUID(),
         timestamp: new Date(),
+        read: false,
       };
-      setNotifications((prev) => [newNotification, ...prev.slice(0, 9)]); // Keep last 10
+      setStoredNotifications((prev) => [newNotification, ...prev.slice(0, 49)]); // Keep last 50
 
-      // Auto-dismiss after 5 seconds if enabled
-      if (notification.autoDismiss !== false) {
-        setTimeout(() => {
-          setNotifications((prev) => prev.filter((n) => n.id !== newNotification.id));
-        }, 5000);
+      // Browser notification if enabled
+      if (prefs.browserNotifications && 'Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new window.Notification(notification.title, { body: notification.message });
+        } else if (Notification.permission !== 'denied') {
+          window.Notification.requestPermission();
+        }
       }
+
+      // Sound effect placeholder - can be implemented later
+      // if (prefs.soundEffects) {
+      //   playNotificationSound(notification.type);
+      // }
     },
-    []
+    [settings.notifications, setStoredNotifications]
   );
 
   const dismissNotification = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
+    setStoredNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, [setStoredNotifications]);
 
   const clearNotifications = useCallback(() => {
-    setNotifications([]);
-  }, []);
+    setStoredNotifications([]);
+  }, [setStoredNotifications]);
+
+  const markAsRead = useCallback((id: string) => {
+    setStoredNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  }, [setStoredNotifications]);
+
+  const markAllAsRead = useCallback(() => {
+    setStoredNotifications((prev) =>
+      prev.map((n) => ({ ...n, read: true }))
+    );
+  }, [setStoredNotifications]);
 
   // Recent items
   const addRecentScenario = useCallback(
@@ -240,10 +294,13 @@ export function AppProvider({ children }: AppProviderProps) {
     availableRuleSets,
     selectedRuleSet,
     setSelectedRuleSet,
-    notifications,
+    notifications: storedNotifications,
+    unreadCount,
     addNotification,
     dismissNotification,
     clearNotifications,
+    markAsRead,
+    markAllAsRead,
     recentScenarios,
     recentSimulations,
     addRecentScenario,

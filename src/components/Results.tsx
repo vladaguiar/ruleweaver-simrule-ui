@@ -267,6 +267,7 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
         type: 'error',
         title: 'Failed to Load',
         message: 'Could not load simulations',
+        category: 'simulation',
       });
       setSimulations([]);
     } finally {
@@ -297,6 +298,7 @@ export function Results({ simulationId, onNavigate }: ResultsProps) {
         type: 'error',
         title: 'Failed to Load',
         message: 'Could not load simulation details',
+        category: 'simulation',
       });
     } finally {
       setLoadingDetails(false);

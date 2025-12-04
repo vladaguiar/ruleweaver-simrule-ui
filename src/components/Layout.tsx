@@ -3,8 +3,10 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Menu, Search, Bell, Settings, User, ChevronDown, LayoutDashboard, ClipboardList, Play, BarChart3, Target, Database, Settings as SettingsIcon, Moon, Sun } from 'lucide-react';
 import logoImage from 'figma:asset/158e83f25311585383422c644adbd27e0e9a7b0b.png';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAppContext } from '@/contexts/AppContext';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { GlobalSearchDropdown } from '@/components/GlobalSearchDropdown';
+import { NotificationDropdown } from '@/components/NotificationDropdown';
 import type { ScenarioResponse, SimulationResponse } from '@/types/api.types';
 
 interface LayoutProps {
@@ -27,6 +29,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { effectiveTheme, toggleTheme } = useTheme();
+  const { unreadCount } = useAppContext();
   const darkMode = effectiveTheme === 'dark';
 
   // Global search state
@@ -35,11 +38,27 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchResults = useGlobalSearch(searchQuery);
 
+  // Notifications dropdown state
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
   // Handle clicks outside search dropdown to close it
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setShowSearchDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handle clicks outside notifications dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
       }
     };
 
@@ -140,10 +159,32 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
           >
             {darkMode ? <Sun size={20} /> : <Moon size={20} />}
           </button>
-          <button className="p-2 hover:bg-white/10 rounded transition-colors relative">
-            <Bell size={20} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-[var(--color-accent)] rounded-full"></span>
-          </button>
+          <div className="relative" ref={notificationRef}>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2 hover:bg-white/10 rounded transition-colors relative"
+              title={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
+            >
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center"
+                  style={{
+                    backgroundColor: 'var(--color-accent)',
+                    color: 'white',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    padding: '0 4px',
+                  }}
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {showNotifications && (
+              <NotificationDropdown onClose={() => setShowNotifications(false)} />
+            )}
+          </div>
           <button className="p-2 hover:bg-white/10 rounded transition-colors">
             <Settings size={20} />
           </button>

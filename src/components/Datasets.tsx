@@ -51,13 +51,13 @@ export function Datasets({ onNavigate }: DatasetsProps) {
   const handleDelete = async (datasetId: string) => {
     try {
       await remove(datasetId);
-      addNotification({ type: 'success', title: 'Dataset Deleted', message: 'Dataset deleted successfully' });
+      addNotification({ type: 'success', title: 'Dataset Deleted', message: 'Dataset deleted successfully', category: 'dataset' });
       setShowDeleteConfirm(null);
       if (selectedDataset?.id === datasetId) {
         setSelectedDataset(null);
       }
     } catch (err) {
-      addNotification({ type: 'error', title: 'Delete Failed', message: err instanceof Error ? err.message : 'Failed to delete dataset' });
+      addNotification({ type: 'error', title: 'Delete Failed', message: err instanceof Error ? err.message : 'Failed to delete dataset', category: 'dataset' });
     }
   };
 
@@ -73,7 +73,7 @@ export function Datasets({ onNavigate }: DatasetsProps) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    addNotification({ type: 'success', title: 'Download Complete', message: `Downloaded ${dataset.name}` });
+    addNotification({ type: 'success', title: 'Download Complete', message: `Downloaded ${dataset.name}`, category: 'dataset' });
   };
 
   // Format helpers
@@ -777,7 +777,7 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
 
     if (!validExtensions.includes(ext)) {
-      addNotification({ type: 'error', title: 'Invalid File', message: 'Invalid file type. Please upload JSON, CSV, or Excel files.' });
+      addNotification({ type: 'error', title: 'Invalid File', message: 'Invalid file type. Please upload JSON, CSV, or Excel files.', category: 'dataset' });
       return;
     }
 
@@ -788,7 +788,7 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
 
   const handleUpload = async () => {
     if (!selectedFile || !factType) {
-      addNotification({ type: 'error', title: 'Missing Fields', message: 'Please fill in all required fields' });
+      addNotification({ type: 'error', title: 'Missing Fields', message: 'Please fill in all required fields', category: 'dataset' });
       return;
     }
 
@@ -801,11 +801,11 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
       });
 
       if (result) {
-        addNotification({ type: 'success', title: 'Upload Complete', message: `Dataset "${result.name}" uploaded successfully with ${result.recordCount} records` });
+        addNotification({ type: 'success', title: 'Upload Complete', message: `Dataset "${result.name}" uploaded successfully with ${result.recordCount} records`, category: 'dataset' });
         onSuccess();
       }
     } catch (err) {
-      addNotification({ type: 'error', title: 'Upload Failed', message: err instanceof Error ? err.message : 'Failed to upload dataset' });
+      addNotification({ type: 'error', title: 'Upload Failed', message: err instanceof Error ? err.message : 'Failed to upload dataset', category: 'dataset' });
     }
   };
 

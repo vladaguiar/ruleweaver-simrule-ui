@@ -70,6 +70,7 @@ export function Coverage({ onNavigate }: CoverageProps) {
         type: 'success',
         title: 'Report Generated',
         message: `Coverage report for ${selectedRuleSet} has been generated`,
+        category: 'coverage',
       });
       loadCoverage();
     } catch (e) {
@@ -77,6 +78,7 @@ export function Coverage({ onNavigate }: CoverageProps) {
         type: 'error',
         title: 'Generation Failed',
         message: e instanceof Error ? e.message : 'Failed to generate coverage report',
+        category: 'coverage',
       });
     } finally {
       setGenerating(false);

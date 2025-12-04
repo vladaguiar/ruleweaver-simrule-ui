@@ -49,6 +49,7 @@ export function DatasetEditor({ datasetId, onNavigate }: DatasetEditorProps) {
         type: 'error',
         title: 'Load Failed',
         message: 'Unable to load dataset',
+        category: 'dataset',
       });
     } finally {
       setLoading(false);
@@ -65,6 +66,7 @@ export function DatasetEditor({ datasetId, onNavigate }: DatasetEditorProps) {
         type: 'success',
         title: 'Dataset Updated',
         message: 'Changes saved successfully',
+        category: 'dataset',
       });
       setHasChanges(false);
       onNavigate('datasets');
@@ -77,18 +79,21 @@ export function DatasetEditor({ datasetId, onNavigate }: DatasetEditorProps) {
           type: 'error',
           title: 'Update Failed',
           message: 'Dataset is in use by an active simulation',
+          category: 'dataset',
         });
       } else if (apiError.status === 404) {
         addNotification({
           type: 'error',
           title: 'Update Failed',
           message: 'Dataset not found',
+          category: 'dataset',
         });
       } else {
         addNotification({
           type: 'error',
           title: 'Update Failed',
           message: 'Unable to save changes',
+          category: 'dataset',
         });
       }
     } finally {

@@ -83,6 +83,7 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
           type: 'error',
           title: 'Failed to Load',
           message: 'Could not load scenarios',
+          category: 'scenario',
         });
         setAvailableScenarios([]);
       } finally {
@@ -151,6 +152,7 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
           type: message.passRate === 100 ? 'success' : message.passRate && message.passRate >= 80 ? 'warning' : 'error',
           title: 'Simulation Complete',
           message: `Pass rate: ${message.passRate?.toFixed(1) || 0}%`,
+          category: 'simulation',
         });
         stopTimer();
         break;
@@ -208,6 +210,7 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
         type: 'warning',
         title: 'No Scenarios',
         message: 'Please select at least one scenario to run',
+        category: 'simulation',
       });
       return;
     }
@@ -339,6 +342,7 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
         type: 'error',
         title: 'Simulation Failed',
         message: e instanceof Error ? e.message : 'Failed to start simulation',
+        category: 'simulation',
       });
       setLogs(prev => [...prev, {
         type: 'error',
@@ -385,6 +389,7 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
         type: 'warning',
         title: 'Simulation Cancelled',
         message: result.message || `Simulation was cancelled`,
+        category: 'simulation',
       });
 
     } catch (error: unknown) {
@@ -399,18 +404,21 @@ export function SimulationRunner({ onNavigate }: SimulationRunnerProps) {
           type: 'info',
           title: 'Cannot Cancel',
           message: 'Simulation has already completed or is in a non-cancellable state',
+          category: 'simulation',
         });
       } else if (apiError.status === 404) {
         addNotification({
           type: 'error',
           title: 'Cancel Failed',
           message: 'Simulation not found',
+          category: 'simulation',
         });
       } else {
         addNotification({
           type: 'error',
           title: 'Cancel Failed',
           message: 'Unable to cancel simulation. It may have already completed.',
+          category: 'simulation',
         });
       }
 
