@@ -42,8 +42,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   // Get data from hooks
   const { counts: scenarioCounts, loading: scenariosLoading } = useScenarioCounts();
   const { stats: simStats, loading: statsLoading } = useSimulationStats();
-  const { activityData, loading: activityLoading } = useActivityStats();
-  const { apiStatus, checkApiConnection } = useAppContext();
+  const { activityData, loading: activityLoading, refresh: refreshActivity } = useActivityStats();
+  const { apiStatus, checkApiConnection, settings } = useAppContext();
 
   // Recent simulations state
   const [recentSimulations, setRecentSimulations] = useState<SimulationResponse[]>([]);
@@ -67,6 +67,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   // Overview statistics state (single API call for all overview stats)
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
+
+  // Coverage refresh trigger - increment to force coverage reload
+  const [coverageRefreshTrigger, setCoverageRefreshTrigger] = useState(0);
 
   // Fetch aggregate coverage across all rule sets
   useEffect(() => {
@@ -141,7 +144,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return () => {
       abortController.abort();
     };
-  }, [availableRuleSets, ruleSetsLoading]);
+  }, [availableRuleSets, ruleSetsLoading, coverageRefreshTrigger]);
 
   // Load recent simulations with AbortController for cleanup
   useEffect(() => {
@@ -230,7 +233,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     };
   }, []);
 
-  // Refresh function
+  // Refresh function - refreshes ALL dashboard data
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await checkApiConnection();
@@ -247,11 +250,29 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       if (overviewData) {
         setOverview(overviewData);
       }
+
+      // Refresh activity timeline
+      await refreshActivity();
+
+      // Trigger coverage reload by incrementing the trigger
+      setCoverageRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Failed to refresh:', error);
     }
     setRefreshing(false);
-  }, [checkApiConnection]);
+  }, [checkApiConnection, refreshActivity]);
+
+  // Auto-refresh based on settings.autoRefreshInterval
+  useEffect(() => {
+    // Don't auto-refresh if interval is 0 or negative
+    if (!settings.autoRefreshInterval || settings.autoRefreshInterval <= 0) return;
+
+    const interval = setInterval(() => {
+      handleRefresh();
+    }, settings.autoRefreshInterval);
+
+    return () => clearInterval(interval);
+  }, [settings.autoRefreshInterval, handleRefresh]);
 
   // Helper to get trend data from API response
   const getTrendInfo = (): { change: number; direction: TrendDirection } | null => {

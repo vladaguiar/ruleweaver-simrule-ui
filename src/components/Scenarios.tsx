@@ -66,31 +66,82 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
 
-  // Load scenarios - uses server-side pagination with client-side fallback
+  // Track if we're in search mode (searching all scenarios)
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [allSearchResults, setAllSearchResults] = useState<ScenarioResponse[]>([]);
+
+  // Debounce search term to avoid too many API calls
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm !== debouncedSearchTerm) {
+        setDebouncedSearchTerm(searchTerm);
+        // Reset to first page when search term changes
+        setCurrentPage(0);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, debouncedSearchTerm]);
+
+  // Load scenarios - uses server-side pagination OR full search depending on searchTerm
   const loadScenarios = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const filters: Record<string, string | undefined> = {};
-      if (statusFilter !== 'all') filters.status = statusFilter;
-      if (ruleSetFilter !== 'all') filters.ruleSet = ruleSetFilter;
+      // If there's a search term, fetch ALL matching scenarios
+      if (debouncedSearchTerm.trim().length > 0) {
+        const searchResults = await scenarioService.search(debouncedSearchTerm);
 
-      // Try server-side pagination first (with fallback in the service)
-      const result = await scenarioService.getPaginated(
-        { page: currentPage, size: pageSize },
-        filters as any
-      );
+        // Apply additional filters (status, ruleSet, tags) client-side
+        const filteredResults = searchResults.filter(scenario => {
+          const matchesStatus = statusFilter === 'all' || scenario.status === statusFilter;
+          const matchesRuleSet = ruleSetFilter === 'all' || scenario.ruleSet === ruleSetFilter;
+          const matchesTags = selectedTags.length === 0 ||
+            selectedTags.every(tag => scenario.tags?.includes(tag));
+          return matchesStatus && matchesRuleSet && matchesTags;
+        });
 
-      setScenarios(result.content);
-      setTotalPages(result.totalPages || 1);
-      setTotalItems(result.totalElements);
+        setAllSearchResults(filteredResults);
+        setIsSearchMode(true);
+
+        // Calculate client-side pagination
+        const totalFiltered = filteredResults.length;
+        const calculatedTotalPages = Math.ceil(totalFiltered / pageSize) || 1;
+
+        // Paginate the filtered results
+        const startIndex = currentPage * pageSize;
+        const paginatedResults = filteredResults.slice(startIndex, startIndex + pageSize);
+
+        setScenarios(paginatedResults);
+        setTotalPages(calculatedTotalPages);
+        setTotalItems(totalFiltered);
+      } else {
+        // No search term - use server-side pagination
+        setIsSearchMode(false);
+        setAllSearchResults([]);
+
+        const filters: Record<string, string | undefined> = {};
+        if (statusFilter !== 'all') filters.status = statusFilter;
+        if (ruleSetFilter !== 'all') filters.ruleSet = ruleSetFilter;
+
+        const result = await scenarioService.getPaginated(
+          { page: currentPage, size: pageSize },
+          filters as any
+        );
+
+        setScenarios(result.content);
+        setTotalPages(result.totalPages || 1);
+        setTotalItems(result.totalElements);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load scenarios');
       setScenarios([]);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, statusFilter, ruleSetFilter, selectedTags]);
+  }, [currentPage, pageSize, statusFilter, ruleSetFilter, selectedTags, debouncedSearchTerm]);
 
   // Load tags filter options
   useEffect(() => {
@@ -110,18 +161,15 @@ export function Scenarios({ onNavigate }: ScenariosProps) {
     loadScenarios();
   }, [loadScenarios]);
 
-  // Filter scenarios by search term and tags (client-side for instant feedback)
+  // Filter scenarios by tags only (search is now handled in loadScenarios)
+  // This provides instant feedback for tag filtering on the current page
   const filteredScenarios = scenarios.filter(scenario => {
-    // Search term filter
-    const matchesSearch = searchTerm === '' ||
-      scenario.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      scenario.description?.toLowerCase().includes(searchTerm.toLowerCase());
-
     // Tag filter - scenario must have ALL selected tags
-    const matchesTags = selectedTags.length === 0 ||
+    // Note: When in search mode, tags are already filtered in loadScenarios
+    const matchesTags = isSearchMode || selectedTags.length === 0 ||
       selectedTags.every(tag => scenario.tags?.includes(tag));
 
-    return matchesSearch && matchesTags;
+    return matchesTags;
   });
 
   // Calculate tag counts for badges

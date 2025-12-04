@@ -219,6 +219,20 @@ class SimulationService {
     const endpoint = API_ENDPOINTS.SIMULATION_CANCEL(simulationId);
     return apiService.delete<CancellationResponse>(endpoint, options);
   }
+
+  /**
+   * Search simulations by name or ID
+   */
+  async search(query: string, options?: RequestOptions): Promise<SimulationResponse[]> {
+    const allSimulations = await this.getAll(undefined, options);
+    const lowerQuery = query.toLowerCase();
+
+    return allSimulations.filter(
+      (s) =>
+        s.name?.toLowerCase().includes(lowerQuery) ||
+        s.id.toLowerCase().includes(lowerQuery)
+    );
+  }
 }
 
 // Export singleton instance

@@ -1,13 +1,16 @@
 import image_59e9396d40de986427c610e93570952e90e5ca14 from 'figma:asset/59e9396d40de986427c610e93570952e90e5ca14.png';
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Menu, Search, Bell, Settings, User, ChevronDown, LayoutDashboard, ClipboardList, Play, BarChart3, Target, Database, Settings as SettingsIcon, Moon, Sun } from 'lucide-react';
 import logoImage from 'figma:asset/158e83f25311585383422c644adbd27e0e9a7b0b.png';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useGlobalSearch } from '@/hooks/useGlobalSearch';
+import { GlobalSearchDropdown } from '@/components/GlobalSearchDropdown';
+import type { ScenarioResponse, SimulationResponse } from '@/types/api.types';
 
 interface LayoutProps {
   children: React.ReactNode;
   currentPage: string;
-  onNavigate: (page: string) => void;
+  onNavigate: (page: string, params?: { scenarioId?: string; simulationId?: string }) => void;
 }
 
 const menuItems = [
@@ -25,6 +28,61 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { effectiveTheme, toggleTheme } = useTheme();
   const darkMode = effectiveTheme === 'dark';
+
+  // Global search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchResults = useGlobalSearch(searchQuery);
+
+  // Handle clicks outside search dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSearchDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handle scenario selection from search
+  const handleSelectScenario = useCallback((scenario: ScenarioResponse) => {
+    setSearchQuery('');
+    setShowSearchDropdown(false);
+    onNavigate('scenario-editor', { scenarioId: scenario.id });
+  }, [onNavigate]);
+
+  // Handle simulation selection from search
+  const handleSelectSimulation = useCallback((simulation: SimulationResponse) => {
+    setSearchQuery('');
+    setShowSearchDropdown(false);
+    onNavigate('results', { simulationId: simulation.id });
+  }, [onNavigate]);
+
+  // Handle search input change
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    if (e.target.value.length >= 2) {
+      setShowSearchDropdown(true);
+    }
+  }, []);
+
+  // Handle search input focus
+  const handleSearchFocus = useCallback(() => {
+    if (searchQuery.length >= 2) {
+      setShowSearchDropdown(true);
+    }
+  }, [searchQuery]);
+
+  // Handle Escape key to close dropdown
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setShowSearchDropdown(false);
+      (e.target as HTMLInputElement).blur();
+    }
+  }, []);
 
   return (
     <div className={`min-h-screen bg-[var(--color-surface)] ${darkMode ? 'dark' : ''}`}>
@@ -48,15 +106,29 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
           </div>
         </div>
         
-        <div className="flex-1 max-w-md mx-8 hidden md:block">
+        <div className="flex-1 max-w-md mx-8 hidden md:block" ref={searchContainerRef}>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/70" size={20} />
             <input
               type="text"
-              placeholder="Search scenarios, results..."
+              placeholder="Search scenarios, simulations..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onFocus={handleSearchFocus}
+              onKeyDown={handleSearchKeyDown}
               className="w-full bg-white/10 border border-white/20 rounded pl-10 pr-4 py-2 text-white placeholder-white/60 focus:bg-white/20 focus:outline-none transition-colors"
               style={{ fontSize: '14px' }}
             />
+            {/* Global Search Dropdown */}
+            {showSearchDropdown && searchQuery.length >= 2 && (
+              <GlobalSearchDropdown
+                results={searchResults}
+                query={searchQuery}
+                onSelectScenario={handleSelectScenario}
+                onSelectSimulation={handleSelectSimulation}
+                onClose={() => setShowSearchDropdown(false)}
+              />
+            )}
           </div>
         </div>
 
