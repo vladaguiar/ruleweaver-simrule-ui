@@ -4,7 +4,15 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { apiService } from '@/services';
 import { applyColorPreset } from '@/config/colorPresets';
-import type { AppSettings, ScenarioResponse, SimulationResponse } from '@/types/api.types';
+import type { AppSettings, ScenarioResponse, SimulationResponse, UserProfile } from '@/types/api.types';
+
+// Default profile
+const defaultProfile: UserProfile = {
+  fullName: 'John Doe',
+  email: 'john.doe@tekweaver.com',
+  role: 'Senior Test Engineer',
+  department: 'Quality Assurance',
+};
 
 // Default settings
 const defaultSettings: AppSettings = {
@@ -34,6 +42,10 @@ interface AppContextState {
   // User info
   userId: string;
   userName: string;
+
+  // Profile
+  profile: UserProfile;
+  updateProfile: (profile: UserProfile) => void;
 
   // Settings
   settings: AppSettings;
@@ -92,6 +104,7 @@ interface AppProviderProps {
 export function AppProvider({ children }: AppProviderProps) {
   // Persisted state
   const [settings, setSettings] = useLocalStorage<AppSettings>('simrule_settings', defaultSettings);
+  const [profile, setProfile] = useLocalStorage<UserProfile>('simrule_profile', defaultProfile);
   const [recentScenarios, setRecentScenarios] = useLocalStorage<ScenarioResponse[]>(
     'simrule_recent_scenarios',
     []
@@ -162,6 +175,14 @@ export function AppProvider({ children }: AppProviderProps) {
     setSettings(defaultSettings);
     apiService.setBaseUrl(defaultSettings.apiBaseUrl);
   }, [setSettings]);
+
+  // Profile management
+  const updateProfile = useCallback(
+    (newProfile: UserProfile) => {
+      setProfile(newProfile);
+    },
+    [setProfile]
+  );
 
   // API connection check
   const checkApiConnection = useCallback(async (): Promise<boolean> => {
@@ -284,6 +305,8 @@ export function AppProvider({ children }: AppProviderProps) {
   const value: AppContextState = {
     userId,
     userName,
+    profile,
+    updateProfile,
     settings,
     updateSettings,
     resetSettings,
@@ -323,4 +346,4 @@ export function useAppContext(): AppContextState {
 }
 
 // Export for type inference
-export type { AppContextState, Notification, AppSettings };
+export type { AppContextState, Notification, AppSettings, UserProfile };

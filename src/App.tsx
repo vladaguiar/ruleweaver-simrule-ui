@@ -31,6 +31,7 @@ interface PageState {
     scenarioId?: string;
     simulationId?: string;
     datasetId?: string;
+    tab?: string;
   };
 }
 
@@ -72,7 +73,7 @@ export default function App() {
           />
         );
       case "settings":
-        return <Settings />;
+        return <Settings initialTab={pageState.params?.tab} />;
       default:
         return <Dashboard onNavigate={navigate} />;
     }
@@ -83,7 +84,7 @@ export default function App() {
       <AppProvider>
         <Layout
           currentPage={pageState.page}
-          onNavigate={(page) => navigate(page)}
+          onNavigate={(page, params) => navigate(page, params)}
         >
           <ErrorBoundary>
             {renderPage()}

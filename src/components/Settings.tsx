@@ -5,7 +5,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useTheme, Theme } from '@/contexts/ThemeContext';
 import { apiService } from '@/services/api.service';
 import { COLOR_PRESETS, applyColorPreset } from '@/config/colorPresets';
-import type { AppSettings, ExecutionMode, ColorPreset } from '@/types/api.types';
+import type { AppSettings, ExecutionMode, ColorPreset, UserProfile } from '@/types/api.types';
 
 // Default settings
 const DEFAULT_SETTINGS: AppSettings = {
@@ -32,22 +32,36 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 type ConnectionStatus = 'idle' | 'testing' | 'success' | 'error';
 
-export function Settings() {
-  const [activeTab, setActiveTab] = useState('api');
+interface SettingsProps {
+  initialTab?: string;
+}
+
+export function Settings({ initialTab }: SettingsProps) {
+  const [activeTab, setActiveTab] = useState(initialTab || 'api');
   const [settings, setSettings, resetSettings] = useLocalStorage<AppSettings>('simrule_settings', DEFAULT_SETTINGS);
   const [apiStatus, setApiStatus] = useState<ConnectionStatus>('idle');
   const [apiError, setApiError] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const { addNotification } = useAppContext();
+  const { addNotification, profile, updateProfile } = useAppContext();
   const { theme, setTheme } = useTheme();
 
   // Form state
   const [formData, setFormData] = useState<AppSettings>(settings);
+  const [profileData, setProfileData] = useState<UserProfile>(profile);
+
+  // Update active tab when initialTab changes (e.g., from navigation)
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Track changes
   useEffect(() => {
-    setHasChanges(JSON.stringify(formData) !== JSON.stringify(settings));
-  }, [formData, settings]);
+    const settingsChanged = JSON.stringify(formData) !== JSON.stringify(settings);
+    const profileChanged = JSON.stringify(profileData) !== JSON.stringify(profile);
+    setHasChanges(settingsChanged || profileChanged);
+  }, [formData, settings, profileData, profile]);
 
   // Update form field
   const updateField = <K extends keyof AppSettings>(field: K, value: AppSettings[K]) => {
@@ -57,11 +71,12 @@ export function Settings() {
   // Save settings
   const handleSave = () => {
     setSettings(formData);
+    updateProfile(profileData);
     // Apply color preset when saving
     if (formData.colorPreset) {
       applyColorPreset(formData.colorPreset);
     }
-    addNotification({ type: 'success', title: 'Settings Saved', message: 'Settings saved successfully' });
+    addNotification({ type: 'success', title: 'Settings Saved', message: 'Settings saved successfully', category: 'system' });
     setHasChanges(false);
   };
 
@@ -654,7 +669,8 @@ export function Settings() {
                   </label>
                   <input
                     type="text"
-                    defaultValue="John Doe"
+                    value={profileData.fullName}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, fullName: e.target.value }))}
                     className="w-full px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
                     style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
                   />
@@ -665,7 +681,8 @@ export function Settings() {
                   </label>
                   <input
                     type="email"
-                    defaultValue="john.doe@tekweaver.com"
+                    value={profileData.email}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
                     style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
                   />
@@ -676,7 +693,8 @@ export function Settings() {
                   </label>
                   <input
                     type="text"
-                    defaultValue="Senior Test Engineer"
+                    value={profileData.role}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, role: e.target.value }))}
                     className="w-full px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
                     style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
                   />
@@ -686,13 +704,15 @@ export function Settings() {
                     Department
                   </label>
                   <select
+                    value={profileData.department}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, department: e.target.value }))}
                     className="w-full px-4 py-2 border rounded focus:outline-none focus:border-[var(--color-primary)] transition-colors"
                     style={{ borderColor: 'var(--color-border)', fontSize: '14px', backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)' }}
                   >
-                    <option>Quality Assurance</option>
-                    <option>Engineering</option>
-                    <option>Operations</option>
-                    <option>Management</option>
+                    <option value="Quality Assurance">Quality Assurance</option>
+                    <option value="Engineering">Engineering</option>
+                    <option value="Operations">Operations</option>
+                    <option value="Management">Management</option>
                   </select>
                 </div>
               </div>

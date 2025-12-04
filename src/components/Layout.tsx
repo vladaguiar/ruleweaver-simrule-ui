@@ -12,7 +12,7 @@ import type { ScenarioResponse, SimulationResponse } from '@/types/api.types';
 interface LayoutProps {
   children: React.ReactNode;
   currentPage: string;
-  onNavigate: (page: string, params?: { scenarioId?: string; simulationId?: string }) => void;
+  onNavigate: (page: string, params?: { scenarioId?: string; simulationId?: string; tab?: string }) => void;
 }
 
 const menuItems = [
@@ -29,7 +29,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { effectiveTheme, toggleTheme } = useTheme();
-  const { unreadCount } = useAppContext();
+  const { unreadCount, addNotification } = useAppContext();
   const darkMode = effectiveTheme === 'dark';
 
   // Global search state
@@ -185,7 +185,11 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
               <NotificationDropdown onClose={() => setShowNotifications(false)} />
             )}
           </div>
-          <button className="p-2 hover:bg-white/10 rounded transition-colors">
+          <button
+            onClick={() => onNavigate('settings')}
+            className="p-2 hover:bg-white/10 rounded transition-colors"
+            title="Settings"
+          >
             <Settings size={20} />
           </button>
           <div className="relative">
@@ -200,10 +204,37 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
             </button>
             {showUserMenu && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--color-background)] rounded-lg py-2" style={{ boxShadow: 'var(--shadow-3)' }}>
-                <button className="w-full text-left px-4 py-2 hover:bg-[var(--color-surface)] text-[var(--color-text-primary)] transition-colors" style={{ fontSize: '14px' }}>Profile</button>
-                <button className="w-full text-left px-4 py-2 hover:bg-[var(--color-surface)] text-[var(--color-text-primary)] transition-colors" style={{ fontSize: '14px' }}>Settings</button>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    onNavigate('settings', { tab: 'profile' });
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-[var(--color-surface)] text-[var(--color-text-primary)] transition-colors"
+                  style={{ fontSize: '14px' }}
+                >
+                  Profile
+                </button>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    onNavigate('settings');
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-[var(--color-surface)] text-[var(--color-text-primary)] transition-colors"
+                  style={{ fontSize: '14px' }}
+                >
+                  Settings
+                </button>
                 <hr className="my-2" style={{ borderColor: 'var(--color-border)' }} />
-                <button className="w-full text-left px-4 py-2 hover:bg-[var(--color-surface)] text-[var(--color-text-primary)] transition-colors" style={{ fontSize: '14px' }}>Logout</button>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    addNotification({ type: 'info', title: 'Logged Out', message: 'You have been logged out', category: 'system' });
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-[var(--color-surface)] text-[var(--color-text-primary)] transition-colors"
+                  style={{ fontSize: '14px' }}
+                >
+                  Logout
+                </button>
               </div>
             )}
           </div>

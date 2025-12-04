@@ -417,6 +417,13 @@ export interface NotificationPreferences {
   soundEffects: boolean;
 }
 
+export interface UserProfile {
+  fullName: string;
+  email: string;
+  role: string;
+  department: string;
+}
+
 export type ColorPreset = 'default' | 'ocean' | 'forest' | 'sunset';
 
 export interface AppSettings {
